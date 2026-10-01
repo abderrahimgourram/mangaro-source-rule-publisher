@@ -63,20 +63,27 @@ def run(key,token=None,report_path=None):
     props,_=configuration();public=props['sourceRulesPublicKey'];directory=HERE.parent/'staging';root=directory/'public'
     publisher=VercelPublisher(public,key,HOST,json.loads((directory/'hosting.json').read_text()),root,token,{SID},http_factory=lambda:Http(budget=80,delay=.05))
     if publisher.feed==props['sourceRulesUrl']:raise Unsafe('PRODUCTION_SIMULATION_FORBIDDEN')
-    link=directory/'.vercel'
-    link.mkdir(exist_ok=True)
-    (link/'project.json').write_text(canonical(publisher.hosting))
+    def deploy_fixture():
+        import shutil,tempfile
+        # Artifact deployment: no Android checkout/Git author metadata or private files.
+        with tempfile.TemporaryDirectory(prefix='mangaro-staging-fixture-') as tmp:
+            artifact=Path(tmp)
+            shutil.copytree(root,artifact/'public')
+            shutil.copyfile(directory/'vercel.json',artifact/'vercel.json')
+            (artifact/'.vercel').mkdir()
+            (artifact/'.vercel/project.json').write_text(canonical(publisher.hosting))
+            publisher.command(['deploy','--prod','--yes'],artifact)
     prior=publisher.fetch(SID); revision=verify(prior,public,SID)['revision']+1 if prior else 1
     original=baseline(revision)
     build(root,False)
     signed_baseline=sign(original,key,public)
     path=root/'baseline'/f'{SID}.json';path.parent.mkdir(exist_ok=True);path.write_text(canonical(signed_baseline))
-    publisher.command(['deploy','--prod','--yes'],directory)
+    deploy_fixture()
     await_representation(False)
     http=lambda:Http(budget=80,delay=.05)
     state={'baseline':original,'witness':validate(original,http()),'evidence':capture(original,http())}
     print('Staging healthy: real HTTPS, four manga, full chapter traversal and image verified.')
-    build(root,True);publisher.command(['deploy','--prod','--yes'],directory)
+    build(root,True);deploy_fixture()
     await_representation(True)
     calls=0
     def publish(candidate,previous):
