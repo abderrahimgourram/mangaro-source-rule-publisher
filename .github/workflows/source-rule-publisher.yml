@@ -34,6 +34,12 @@ jobs:
         run: python -m pip install -r tools/source-rules/automation/requirements.txt
       - name: Deterministic inference, rejection and isolation tests
         run: python -m unittest discover -s tools/source-rules/automation -p test_automation.py -v
+      - name: Safe staging generation and signed atomic publication
+        if: inputs.mode == 'staging'
+        env:
+          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_STAGING_AUTOMATION_SECRET }}
+          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
+        run: python tools/source-rules/automation/staging_e2e.py --report staging-receipt.json
       - name: Restore authenticated publisher state
         if: inputs.mode != 'staging'
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -47,7 +53,8 @@ jobs:
           distribution: temurin
           java-version-file: .github/.java-version
       - name: Gradle build cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: gradle_cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.gradle/caches
@@ -55,12 +62,14 @@ jobs:
           key: mangaro-publisher-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
       - name: Build opt-in production parser audit (no signing secret available)
         run: ./gradlew -PsourceAudit=true :app:assembleDebug :app:assembleDebugAndroidTest
-      - name: Safe staging generation and signed atomic publication
-        if: inputs.mode == 'staging'
-        env:
-          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_STAGING_AUTOMATION_SECRET }}
-          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
-        run: python tools/source-rules/automation/staging_e2e.py --report staging-receipt.json
+      - name: Save successful build cache before later acceptance steps
+        if: steps.gradle_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: mangaro-publisher-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
       - name: Emulator production path acceptance (emulator-5554 only)
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         env:
