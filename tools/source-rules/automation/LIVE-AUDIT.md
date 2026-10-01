@@ -32,3 +32,11 @@ No production manifests were created: seven 404s remain valid BUILT_IN state. Na
 filters/status/date/conditional representations cannot all be preserved by schema 1's
 whole-profile replacement. Confirmed failures without a safe equivalent profile are
 reported REQUIRES_COMPILED_UPDATE after three separated monitoring observations.
+
+## Hosted production monitor acceptance
+
+Private Actions staging run [36902550037](https://github.com/abderrahimgourram/mangaro-source-rule-publisher/actions/runs/36902550037) passed: three semantic observations generated one signed repair, revision 12; HTTPS publication verification, unchanged Android engine activation, COMPLETE chapters/Reader and forced-process-restart persistence all passed.
+
+Production run [36903849705](https://github.com/abderrahimgourram/mangaro-source-rule-publisher/actions/runs/36903849705) passed with publication enabled. All seven checks completed independently. TeamX, MangaTime and Azora were HEALTHY; MangaLek and MangaSwat had one pending semantic-failure observation; Hijala retained its unverified native chapter-completeness state (631/202/245 on this later run). MangaDar failed catalogue/search semantic validation in hosted CI despite passing the earlier local Android audit. Details, chapters and Reader were therefore not reachable for MangaDar in CI. This is an observed representation/runtime difference, not a proven selector repair; diagnostics remain sanitized and no guessed rule was published.
+
+All seven production manifests remain absent (valid BUILT_IN 404 state). No native behavior was replaced. The repository publication gate is enabled and the six-hour UTC schedule is active. Unsupported native whole-profile mappings remain an explicit schema-1 limitation; this acceptance proves automatic repair of supported verified declarative mappings, not universal repair of every native parser.
