@@ -14,9 +14,10 @@ class VercelPublisher:
         self.public=public; self.key=private_bytes; self.feed=feed.rstrip('/'); self.hosting=hosting; self.directory=Path(public_directory); self.token=token; self.allowed=set(allowed_ids or []); self.http_factory=http_factory
     def command(self,args,cwd):
         command=['npx','--yes','vercel@62.1.0','--scope','jalem']
-        if self.token: command+=['--token',self.token]
         command+=args
         env={k:v for k,v in os.environ.items() if k not in {'MANGARO_AUTOMATION_SECRET','MANGARO_SIGNING_KEY','MANGARO_SIGNING_KEY_B64'} and not k.startswith(('GITHUB_','VERCEL_GIT_'))}
+        if self.token: env['VERCEL_TOKEN']=self.token
+        env['VERCEL_TELEMETRY_DISABLED']='1'
         # Never print commands, raw CLI stdout/stderr or exception repr; they could contain credentials.
         p=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=240)
         if p.returncode: raise Unsafe('VERCEL_'+args[0].upper()+'_FAILED')

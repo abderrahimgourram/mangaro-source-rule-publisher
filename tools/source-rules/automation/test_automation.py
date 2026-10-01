@@ -224,6 +224,18 @@ class PublicationGateTest(unittest.TestCase):
         import tempfile
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.publisher=Publisher(self.public,self.pem,self.feed,{},Path(self.tmp.name),allowed_ids={ID,ID-1},http_factory=lambda:Transport(self.site,1))
+    def test_cli_token_is_environment_only(self):
+        from automation.publisher import VercelPublisher
+        from types import SimpleNamespace
+        publisher=VercelPublisher(self.public,self.pem,self.feed,{},Path(self.tmp.name),token='test-ci-credential',allowed_ids={ID})
+        def invoke(command,**kwargs):
+            self.assertNotIn('--token',command);self.assertNotIn('test-ci-credential',command)
+            self.assertEqual(kwargs['env']['VERCEL_TOKEN'],'test-ci-credential')
+            self.assertNotIn('MANGARO_AUTOMATION_SECRET',kwargs['env'])
+            self.assertFalse(any(k.startswith('GITHUB_') for k in kwargs['env']))
+            return SimpleNamespace(returncode=0,stdout='public-response')
+        with patch('automation.publisher.subprocess.run',side_effect=invoke):
+            self.assertEqual(publisher.command(['curl','/manifest.json'],Path(self.tmp.name)),'public-response')
     def test_executable_catalogue_identity_rejected(self):
         candidate=profile();candidate['revision']=2
         candidate['operations']['popular']['identity']='javascript:alert(1)'
