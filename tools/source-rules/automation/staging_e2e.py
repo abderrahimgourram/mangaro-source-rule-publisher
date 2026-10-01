@@ -51,13 +51,24 @@ def baseline(revision):
 
 def await_representation(changed):
     import time
+    from urllib.parse import quote
+    root=HERE.parent/'staging/public'
+    expected={p.relative_to(root).as_posix():json.loads(p.read_text()) for p in root.glob('api/**/*.json')}
     for attempt in range(6):
-        r=Http(budget=3,delay=0).get(HOST+'/api/popular/1.json')
-        if r.status==200:
-            data=json.loads(r.body)
-            if ('postTitle' in data['items'][0])==changed: return
+        http=Http(budget=80,delay=.05);consistent=True
+        for route,wanted in expected.items():
+            # Same query variant as the actual rule evaluator, including paginated requests.
+            query='?page='+Path(route).stem if any('/'+op+'/' in '/'+route for op in ('popular','latest','search','chapters')) else ''
+            response=http.get(HOST+'/'+quote(route,safe='/')+query)
+            if response.status!=200:
+                consistent=False;break
+            try: received=json.loads(response.body)
+            except ValueError:consistent=False;break
+            if received!=wanted:
+                consistent=False;break
+        if consistent:return
         time.sleep(2)
-    raise Unsafe('STAGING_ALIAS_PROPAGATION_TIMEOUT')
+    raise Unsafe('STAGING_DATASET_PROPAGATION_TIMEOUT')
 
 def run(key,token=None,report_path=None):
     props,_=configuration();public=props['sourceRulesPublicKey'];directory=HERE.parent/'staging';root=directory/'public'
