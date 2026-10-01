@@ -245,7 +245,10 @@ def validate(r,http,previous=None):
     if nxt:
         second,_=interp.catalogue('popular',2)
         if {x['id'] for x in first}&{x['id'] for x in second} or {x['url'] for x in first}&{x['url'] for x in second}: raise Unsafe('REPEATED_CATALOGUE_PAGE')
-    recent,_=interp.catalogue('latest')
+    recent,recent_next=interp.catalogue('latest')
+    if recent_next:
+        later,_=interp.catalogue('latest',2)
+        if {x['id'] for x in recent}&{x['id'] for x in later} or {x['url'] for x in recent}&{x['url'] for x in later}: raise Unsafe('REPEATED_LATEST_PAGE')
     # Different popularity positions plus latest; include persisted large/older witnesses first.
     samples={m['id']:m for m in first+second+recent}
     known=(previous or {}).get('works',{})
@@ -261,9 +264,12 @@ def validate(r,http,previous=None):
         if m['id'] not in {x['id'] for x in selected}: selected.append(m)
     selected=selected[:4]
     if len(selected)<min(3,len(samples)): raise Unsafe('INSUFFICIENT_MULTI_MANGA_SAMPLE')
-    witnesses={}
+    witnesses={}; image_checked=False
     for index,m in enumerate(selected):
-        search,_=interp.catalogue('search',query=m['title'])
+        search,search_next=interp.catalogue('search',query=m['title'])
+        if search_next:
+            later,_=interp.catalogue('search',2,query=m['title'])
+            if {x['id'] for x in search}&{x['id'] for x in later} or {x['url'] for x in search}&{x['url'] for x in later}: raise Unsafe('REPEATED_SEARCH_PAGE')
         if not any(x['id']==m['id'] and x['url']==m['url'] for x in search): raise Unsafe('SEARCH_IDENTITY_MISMATCH')
         detail=interp.details(m); chapters=interp.chapters(detail)
         ids={c['id'] for c in chapters}; old=set(known.get(m['id'],{}).get('chapters',[]))
@@ -273,7 +279,8 @@ def validate(r,http,previous=None):
             reader=next((c for c in chapters if c['id']==known.get(m['id'],{}).get('readerChapterId')),chapters[-1])
             pages=interp.pages(reader);reader_id=reader['id'];reader_count=len(pages)
             if reader_id==known.get(m['id'],{}).get('readerChapterId') and reader_count<known[m['id']].get('readerPageCount',0): raise Unsafe('KNOWN_READER_PAGE_COUNT_TRUNCATED')
-            if index==0: image(http.get(pages[0]['image'],headers=r.get('headers',{})|{'Range':'bytes=0-511'},image=True))
+            if not image_checked:
+                image(http.get(pages[0]['image'],headers=r.get('headers',{})|{'Range':'bytes=0-511'},image=True));image_checked=True
         if r['sourceId']==2482399499047903203:
             supported={'MANGA','MANHWA','MANHUA'}
             for name in ['popular','latest','search']:

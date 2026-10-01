@@ -52,6 +52,7 @@ class FakeHttp:
         def response(value,status=200,ctype='application/json'):
             body=value if isinstance(value,bytes) else json.dumps(value).encode() if not isinstance(value,str) else value.encode()
             r=Response(base+path_,status,body,{'Content-Type':ctype});self.responses.append(r);return r
+        if (image or path_.endswith('.png')) and 'bad-image' in changes:return response(b'<html>Error</html>',403,'text/html')
         if image or path_.endswith('.png'):return response(b'\x89PNG\r\n\x1a\n'+bytes(32),ctype='image/png')
         if 'challenge' in changes:return response('<html><form id="challenge-form"></form></html>',ctype='text/html')
         if path_=='/search' and 'endpoint' in changes:
@@ -60,7 +61,7 @@ class FakeHttp:
         page=int(q.get(parameter,['1'])[0])
         if path_ in {'/popular','/latest','/search','/manga'}:
             ids=[1,2] if page==1 else [3,4]
-            if path_=='/latest':ids=[3,4]
+            if path_=='/latest':ids=[3,4] if page==1 or 'latest-repeat' in changes else [1,2]
             if path_ in {'/search','/manga'}:
                 key='s' if 'endpoint' in changes else 'q'; query=q.get(key,[''])[0]
                 ids=[n for n in range(1,5) if query==f'Title {n}']
@@ -68,15 +69,15 @@ class FakeHttp:
             if 'css' in changes or 'css-old' in changes:
                 klass='tile' if 'css' in changes else 'card'; title='caption' if 'css' in changes else 'title'
                 html=''.join(f'<div class="{klass}" data-id="m{n}"><a class="link" href="/m{n}">Read</a><h3 class="{title}">Title {n}</h3><img src="{BASE}/a.png"></div>' for n in ids)
-                if page==1:html+=f'<a rel="next" href="/popular?{parameter}=2">Next</a>'
+                if page==1 and path_ not in {'/search','/manga'}:html+=f'<a rel="next" href="/popular?{parameter}=2">Next</a>'
                 return response(html,ctype='text/html')
-            data={'items':[self.site.manga(n) for n in ids],'total':4}
+            data={'items':[self.site.manga(n) for n in ids],'total':len(ids) if path_ in {'/search','/manga'} else 4}
             if 'pagination' in changes:data['nextPageUrl']=base+'/popular?p=2' if page==1 else None
             return response(data)
         if path_.startswith('/details/'):
             n=int(path_.rsplit('m',1)[-1]);return response({'post':self.site.manga(n)})
         if path_.startswith('/chapters/'):
-            n=int(path_.rsplit('m',1)[-1]);total={1:2,2:6,3:3,4:4}[n]
+            n=int(path_.rsplit('m',1)[-1]);total={1:0 if 'zero-first' in changes else 2,2:6,3:3,4:4}[n]
             if 'unstable' in changes:total+=self.view%2
             chapters=[{'id':f'm{n}-c{i}','url':f'/m{n}/c{i}','name':f'Chapter {i}','number':i+.5} for i in range(1,total+1)]
             if 'invalid' in changes:total+=1
@@ -170,6 +171,15 @@ class AutomationTest(unittest.TestCase):
         c=Controller(site.http,site.publish,clock=lambda:1000000)
         with self.assertRaises(Unsafe):c.run({'sourceId':ID,'name':'diagnostic'},state)
         self.assertEqual(site.publications,0)
+    def test_latest_pagination_loop_cannot_publish(self):
+        site,state,reports=self.repair({'pages','latest-repeat'})
+        self.assertEqual(site.publications,0);self.assertEqual(reports[-1]['result'],'REQUIRES_COMPILED_UPDATE')
+    def test_zero_chapter_first_work_cannot_skip_image_validation(self):
+        site=Site();site.change={'zero-first','bad-image'}
+        with self.assertRaises(Unsafe):validate(profile(),site.http())
+    def test_genuine_zero_first_work_with_other_reader_is_valid(self):
+        site=Site();site.change={'zero-first'}
+        self.assertEqual(validate(profile(),site.http())['works']['m1']['count'],0)
     def test_signed_state_tampering_rejected(self):
         key=ec.generate_private_key(ec.SECP256R1())
         pem=key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())
