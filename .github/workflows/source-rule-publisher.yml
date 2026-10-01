@@ -47,6 +47,8 @@ jobs:
           path: .publisher-state
           key: mangaro-publisher-state-v1-${{ github.run_id }}
           restore-keys: mangaro-publisher-state-v1-
+      - name: Free unused SDK space on this ephemeral hosted runner
+        run: sudo rm -rf /usr/share/dotnet
       - name: Java
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
