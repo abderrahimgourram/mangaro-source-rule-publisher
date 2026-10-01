@@ -160,6 +160,16 @@ class AutomationTest(unittest.TestCase):
         w['works']['m1']['chapters'].append('removed-middle-id')
         with self.assertRaises(Unsafe):validate(r,site.http(),w)
 
+    def test_other_source_state_cannot_be_reused(self):
+        site=Site();state=self.baseline(site);state['sourceId']=ID-1
+        c=Controller(site.http,site.publish,clock=lambda:1000000)
+        with self.assertRaises(Unsafe):c.run({'sourceId':ID,'name':'diagnostic'},state)
+        self.assertEqual(site.publications,0)
+    def test_other_source_baseline_cannot_be_reused(self):
+        site=Site();state=self.baseline(site);state['baseline']['sourceId']=ID-1
+        c=Controller(site.http,site.publish,clock=lambda:1000000)
+        with self.assertRaises(Unsafe):c.run({'sourceId':ID,'name':'diagnostic'},state)
+        self.assertEqual(site.publications,0)
     def test_signed_state_tampering_rejected(self):
         key=ec.generate_private_key(ec.SECP256R1())
         pem=key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())

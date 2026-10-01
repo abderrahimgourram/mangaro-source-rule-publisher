@@ -55,6 +55,8 @@ def main():
         sid=source['sourceId']; file=args.state/f'{sid}.json'
         try:
             state=open_state(json.loads(file.read_text()),public) if file.exists() else {}
+            if state.get('sourceId') is None: state={} # Safely discard old unscoped publisher counters, never app data.
+            elif state['sourceId']!=sid: raise Unsafe('SIGNED_STATE_SOURCE_MISMATCH')
             # Public signed feed is authoritative. A valid 404 is BUILT_IN, not a source outage.
             response=Http(budget=4).get(feed+'/'+str(sid)+'.json')
             if response.status==200:
@@ -64,7 +66,7 @@ def main():
             def publish(candidate,previous):
                 if pub is None: raise Unsafe('PUBLICATION_DISABLED_AUDIT_ONLY')
                 # Reserve monotonic revision before an external action can succeed/fail.
-                pending=dict(state,revisionFloor=max(state.get('revisionFloor',0),candidate['revision']))
+                pending=dict(state,sourceId=sid,revisionFloor=max(state.get('revisionFloor',0),candidate['revision']))
                 atomic(file,seal_state(pending,key,public))
                 with publication_lock: pub(candidate,previous)
             updated,report=Controller(lambda:Http(budget=80),publish).run(source,state,remote,natives.get(sid))

@@ -44,6 +44,8 @@ class Controller:
     def run(self,source,state,remote=None,native=None):
         """The caller persists this source's state even when another source fails."""
         sid=source['sourceId']; now=self.clock(); new=copy.deepcopy(state)
+        if new.get('sourceId',sid)!=sid or any(r and r.get('sourceId')!=sid for r in (remote,new.get('baseline'))): raise Unsafe('SOURCE_STATE_IDENTITY_MISMATCH')
+        new['sourceId']=sid
         report={'sourceId':sid,'source':source['name'],'health':'DEGRADED','result':'NO_PUBLICATION','attempts':[]}
         # Reports contain code/field names only, never bodies, exception messages or URLs.
         if now-new.get('lastCheck',0)<300: return new,report|{'result':'RECENT_CHECK_SKIPPED'}
