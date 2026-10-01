@@ -168,7 +168,9 @@ class Interpreter:
                     try: value=base64.b64decode(value,validate=True).decode()
                     except (ValueError,UnicodeDecodeError): raise Unsafe('INVALID_BASE64_FIELD') from None
                 fields[k]=value
-            if 'url' in fields: fields['url']=expand(o.get('identity','{url}'),v|fields)
+            if 'url' in fields:
+                fields['url']=expand(o.get('identity','{url}'),v|fields)
+                public_url(urljoin(self.r['baseUrl'],fields['url']))
             for k in ['image','cover']:
                 if fields.get(k): fields[k]=public_url(urljoin(self.r['baseUrl'],fields[k]))
             values.append(fields)

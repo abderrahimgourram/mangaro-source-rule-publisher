@@ -224,6 +224,12 @@ class PublicationGateTest(unittest.TestCase):
         import tempfile
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.publisher=Publisher(self.public,self.pem,self.feed,{},Path(self.tmp.name),allowed_ids={ID,ID-1},http_factory=lambda:Transport(self.site,1))
+    def test_executable_catalogue_identity_rejected(self):
+        candidate=profile();candidate['revision']=2
+        candidate['operations']['popular']['identity']='javascript:alert(1)'
+        old=copy.deepcopy(self.site.public)
+        with self.assertRaises(Unsafe):self.publisher(candidate)
+        self.assertEqual(self.site.public,old);self.assertIsNone(self.staged)
     def test_atomic_publication_preserves_other_source(self):
         old=copy.deepcopy(self.site.public[ID-1]);candidate=profile();candidate['revision']=2
         self.publisher(candidate)
