@@ -89,7 +89,7 @@ class FakeHttp:
         if path_.startswith('/pages/'):
             key='images' if 'pages' in changes else 'pages'
             if 'unsupported' in changes:return response({'encrypted':'requires JavaScript'})
-            return response({key:[BASE+'/a.png',BASE+'/b.png']})
+            return response({key:[BASE+'/a.png'] if 'short-reader' in changes else [BASE+'/a.png',BASE+'/b.png']})
         return response({},404)
 
 class AutomationTest(unittest.TestCase):
@@ -151,6 +151,9 @@ class AutomationTest(unittest.TestCase):
         site,state,reports=self.repair({'pages'});self.assertEqual(site.publications,1)
         restored=json.loads(canonical(state));c=Controller(site.http,site.publish,clock=lambda:1100000);new,report=c.run({'sourceId':ID,'name':'diagnostic'},restored)
         self.assertEqual(report['health'],'HEALTHY');self.assertEqual(site.publications,1);self.assertEqual(new['baseline']['revision'],2)
+    def test_known_reader_page_count_cannot_truncate(self):
+        site=Site();r=profile();w=validate(r,site.http());site.change={'short-reader'}
+        with self.assertRaises(Unsafe):validate(r,site.http(),w)
     def test_known_chapter_floor_and_decimal_identity(self):
         site=Site();r=profile();w=validate(r,site.http());m=Interpreter(r,site.http()).catalogue('popular')[0][0];chapters=Interpreter(r,site.http()).chapters(m)
         self.assertEqual(float(chapters[0]['number']),1.5)

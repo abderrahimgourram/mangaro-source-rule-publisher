@@ -268,14 +268,17 @@ def validate(r,http,previous=None):
         detail=interp.details(m); chapters=interp.chapters(detail)
         ids={c['id'] for c in chapters}; old=set(known.get(m['id'],{}).get('chapters',[]))
         if not old<=ids: raise Unsafe('KNOWN_CHAPTER_IDENTITIES_LOST')
+        reader_id='';reader_count=0
         if chapters:
-            pages=interp.pages(chapters[-1])
+            reader=next((c for c in chapters if c['id']==known.get(m['id'],{}).get('readerChapterId')),chapters[-1])
+            pages=interp.pages(reader);reader_id=reader['id'];reader_count=len(pages)
+            if reader_id==known.get(m['id'],{}).get('readerChapterId') and reader_count<known[m['id']].get('readerPageCount',0): raise Unsafe('KNOWN_READER_PAGE_COUNT_TRUNCATED')
             if index==0: image(http.get(pages[0]['image'],headers=r.get('headers',{})|{'Range':'bytes=0-511'},image=True))
         if r['sourceId']==2482399499047903203:
             supported={'MANGA','MANHWA','MANHUA'}
             for name in ['popular','latest','search']:
                 if set(r['operations'][name].get('required',{}).get('seriesType',[]))!=supported: raise Unsafe('AZORA_NOVEL_FILTER_LOST')
-        witnesses[m['id']]={'url':m['url'],'title':m['title'],'chapters':sorted(ids),'count':len(ids)}
+        witnesses[m['id']]={'url':m['url'],'title':m['title'],'chapters':sorted(ids),'count':len(ids),'readerChapterId':reader_id,'readerPageCount':reader_count}
     if not witnesses or not any(w['count'] for w in witnesses.values()): raise Unsafe('NO_READER_SAMPLE')
     return {'works':witnesses,'popular':len(first),'page2':len(second),'latest':len(recent)}
 

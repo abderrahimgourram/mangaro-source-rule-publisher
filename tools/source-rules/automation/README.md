@@ -49,7 +49,7 @@ unique stable-identity evidence for each changed extraction, schema-1 compatibil
 two identical full validation passes, and a final pre-signing validation. Validation
 checks differing catalogue pages, search identity, details identity, several works,
 all bounded chapter pages, unique chapter identities, exact totals where declared,
-retention of known chapter IDs, and a real image signature. Partial native chapter
+retention of known chapter IDs and Reader page counts, and a real image signature. Partial native chapter
 results cannot become a COMPLETE generic baseline. Azora NOVEL exclusion is mandatory.
 
 JSON paths/selectors/endpoints/domain/query mappings are inferred only from prior known
