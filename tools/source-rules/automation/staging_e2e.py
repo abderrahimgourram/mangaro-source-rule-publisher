@@ -96,7 +96,7 @@ def run(key,token=None,report_path=None):
         controller.clock=lambda poll=poll:1000000+poll*21600
         state,result=controller.run({'sourceId':SID,'name':'unregistered staging acceptance'},state)
         statuses.append(result['result'])
-    if statuses!=['FAILURE_PENDING','FAILURE_PENDING','REPAIRED'] or calls!=1:raise Unsafe('E2E_AUTOMATIC_REPAIR_FAILED_'+statuses[-1])
+    if statuses!=['FAILURE_PENDING','FAILURE_PENDING','REPAIRED'] or calls!=1:raise Unsafe('E2E_AUTOMATIC_REPAIR_FAILED_'+statuses[-1]+'_'+result.get('reason','UNKNOWN_GATE'))
     fetched=publisher.fetch(SID);current=verify(fetched,public,SID)
     if current!=state['baseline']:raise Unsafe('E2E_PUBLIC_PAYLOAD_MISMATCH')
     # Real HTTPS fresh controller restored from serialized state; no manual candidate payload.

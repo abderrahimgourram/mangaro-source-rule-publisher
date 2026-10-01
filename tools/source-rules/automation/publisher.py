@@ -19,7 +19,7 @@ class VercelPublisher:
         env={k:v for k,v in os.environ.items() if k not in {'MANGARO_AUTOMATION_SECRET','MANGARO_SIGNING_KEY','MANGARO_SIGNING_KEY_B64'} and not k.startswith(('GITHUB_','VERCEL_GIT_'))}
         # Never print commands, raw CLI stdout/stderr or exception repr; they could contain credentials.
         p=subprocess.run(command,cwd=cwd,env=env,capture_output=True,text=True,timeout=240)
-        if p.returncode: raise Unsafe('VERCEL_COMMAND_FAILED')
+        if p.returncode: raise Unsafe('VERCEL_'+args[0].upper()+'_FAILED')
         return p.stdout
     def fetch(self,sid):
         response=self.http_factory().get(self.feed+'/'+str(sid)+'.json')
