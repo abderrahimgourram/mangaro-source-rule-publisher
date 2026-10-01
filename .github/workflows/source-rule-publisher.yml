@@ -71,6 +71,8 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: mangaro-publisher-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/*.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', 'PUBLISHER_ANDROID_HEAD') }}
+      - name: Release build JVM memory before starting Android
+        run: ./gradlew --stop
       - name: Enable acceleration in the ephemeral GitHub runner
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -84,7 +86,9 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -port 5554
+          disk-size: 4096M
+          emulator-boot-timeout: 300
+          emulator-options: -no-window -no-snapshot -no-audio -no-boot-anim -gpu swiftshader_indirect -port 5554
           disable-animations: true
           script: bash tools/source-rules/automation/emulator-audit.sh
       - name: Independent monitoring and gated production publishing
