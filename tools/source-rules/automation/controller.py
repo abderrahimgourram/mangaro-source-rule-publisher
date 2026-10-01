@@ -68,7 +68,8 @@ class Controller:
                     report['baseline']='DECLARATIVE_EQUIVALENT'
                 except Unsafe as e:
                     report['baseline']=str(e); new['nativeCapability']=str(e)
-                return new,report|{'health':'HEALTHY','result':'BUILT_IN_HEALTHY'}
+                unverified=any(v.startswith(('PASS_PARTIAL_','PASS_DEGRADED_','PASS_FAILED_')) for v in steps.values())
+                return new,report|{'health':'DEGRADED' if unverified else 'HEALTHY','result':'BUILT_IN_CHAPTERS_UNVERIFIED' if unverified else 'BUILT_IN_HEALTHY'}
             if transient:
                 new['failures']=0
                 return new,report|{'result':'TRANSIENT_NO_REPAIR'}

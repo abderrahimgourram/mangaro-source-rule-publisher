@@ -191,4 +191,59 @@ class AutomationTest(unittest.TestCase):
             updated,report=c.run({'sourceId':ID,'name':'diagnostic'},state)
         self.assertEqual(updated['baseline'],prior);self.assertEqual(site.publications,0)
 
+class PublicationGateTest(unittest.TestCase):
+    def setUp(self):
+        from automation.publisher import VercelPublisher
+        self.site=Site();self.feed='https://feed-test.example';self.staged=None;self.promotes=0;self.tamper=False;self.concurrent=False
+        self.key=ec.generate_private_key(ec.SECP256R1())
+        self.pem=self.key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())
+        self.public=base64.b64encode(self.key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)).decode()
+        old=profile();other=copy.deepcopy(old);other['sourceId']=ID-1
+        self.site.public={ID:sign(old,self.pem,self.public),ID-1:sign(other,self.pem,self.public)}
+        test=self
+        class Transport(FakeHttp):
+            def get(self,url,*args,**kwargs):
+                if url.startswith(test.feed+'/'):
+                    sid=int(urlsplit(url).path[1:].split('.')[0]);value=test.site.public.get(sid)
+                    return Response(url,200 if value else 404,canonical(value).encode(),{})
+                return super().get(url,*args,**kwargs)
+        class Publisher(VercelPublisher):
+            def command(self,args,cwd):
+                if args[0]=='deploy':
+                    test.staged={int(p.stem):json.loads(p.read_text()) for p in (cwd/'public').glob('*.json')}
+                    return 'https://staged-test.vercel.app'
+                if args[0]=='curl':
+                    value=copy.deepcopy(test.staged[ID])
+                    if test.tamper:value['payload']+=' '
+                    if test.concurrent:
+                        r=profile();r['revision']=3;test.site.public[ID]=sign(r,test.pem,test.public)
+                    return canonical(value)
+                if args[0]=='promote':
+                    test.promotes+=1;test.site.public.update(test.staged);return ''
+                raise AssertionError('Unexpected command')
+        import tempfile
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.publisher=Publisher(self.public,self.pem,self.feed,{},Path(self.tmp.name),allowed_ids={ID,ID-1},http_factory=lambda:Transport(self.site,1))
+    def test_atomic_publication_preserves_other_source(self):
+        old=copy.deepcopy(self.site.public[ID-1]);candidate=profile();candidate['revision']=2
+        self.publisher(candidate)
+        self.assertEqual(self.promotes,1);self.assertEqual(self.site.public[ID-1],old)
+        self.assertEqual(verify(self.site.public[ID],self.public,ID)['revision'],2)
+    def test_staged_tampering_cannot_promote(self):
+        old=copy.deepcopy(self.site.public);self.tamper=True;candidate=profile();candidate['revision']=2
+        with self.assertRaises(Unsafe):self.publisher(candidate)
+        self.assertEqual(self.promotes,0);self.assertEqual(self.site.public,old)
+    def test_concurrent_publication_cannot_be_overwritten(self):
+        self.concurrent=True;candidate=profile();candidate['revision']=2
+        with self.assertRaises(Unsafe):self.publisher(candidate)
+        self.assertEqual(self.promotes,0);self.assertEqual(verify(self.site.public[ID],self.public,ID)['revision'],3)
+    def test_bad_candidate_leaves_previous_public_rule(self):
+        old=copy.deepcopy(self.site.public);candidate=profile();candidate['revision']=2
+        candidate['operations']['pages']['rows']='missing'
+        with self.assertRaises(Unsafe):self.publisher(candidate)
+        self.assertIsNone(self.staged);self.assertEqual(self.site.public,old)
+    def test_revision_downgrade_rejected(self):
+        with self.assertRaises(Unsafe):self.publisher(profile())
+        self.assertEqual(self.promotes,0);self.assertIsNone(self.staged)
+
 if __name__=='__main__':unittest.main()
