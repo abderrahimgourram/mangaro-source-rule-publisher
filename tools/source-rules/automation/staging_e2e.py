@@ -74,6 +74,9 @@ def run(key,token=None,report_path=None):
             (artifact/'.vercel/project.json').write_text(canonical(publisher.hosting))
             publisher.command(['deploy','--prod','--yes'],artifact)
     prior=publisher.fetch(SID); revision=verify(prior,public,SID)['revision']+1 if prior else 1
+    active_file=root/f'{SID}.json'
+    if prior: active_file.write_text(canonical(prior))
+    else: active_file.unlink(missing_ok=True)
     original=baseline(revision)
     build(root,False)
     signed_baseline=sign(original,key,public)
