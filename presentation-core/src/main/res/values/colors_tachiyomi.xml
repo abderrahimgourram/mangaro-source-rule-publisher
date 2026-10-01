@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="tachiyomi_primary">#A78BFA</color>
+    <color name="tachiyomi_onPrimary">#150A21</color>
+    <color name="tachiyomi_primaryContainer">#381F5C</color>
+    <color name="tachiyomi_onPrimaryContainer">#D8B4E2</color>
+    <color name="tachiyomi_inversePrimary">#6D28D9</color>
+    <color name="tachiyomi_secondary">#FFB800</color>
+    <color name="tachiyomi_onSecondary">#261A00</color>
+    <color name="tachiyomi_secondaryContainer">#5E4300</color>
+    <color name="tachiyomi_onSecondaryContainer">#FFDF7D</color>
+    <color name="tachiyomi_tertiary">#FFB800</color>
+    <color name="tachiyomi_onTertiary">#261A00</color>
+    <color name="tachiyomi_tertiaryContainer">#5E4300</color>
+    <color name="tachiyomi_onTertiaryContainer">#FFDF7D</color>
+    <color name="tachiyomi_background">#0F0B13</color>
+    <color name="tachiyomi_onBackground">#F0E6F6</color>
+    <color name="tachiyomi_surface">#18121D</color>
+    <color name="tachiyomi_onSurface">#F0E6F6</color>
+    <color name="tachiyomi_surfaceVariant">#231B2A</color>
+    <color name="tachiyomi_onSurfaceVariant">#C7BCD1</color>
+    <color name="tachiyomi_surfaceTint">#A78BFA</color>
+    <color name="tachiyomi_inverseSurface">#E2D6E9</color>
+    <color name="tachiyomi_inverseOnSurface">#18121D</color>
+    <color name="tachiyomi_error">#FFB4AB</color>
+    <color name="tachiyomi_onError">#690005</color>
+    <color name="tachiyomi_errorContainer">#93000A</color>
+    <color name="tachiyomi_onErrorContainer">#FFDAD6</color>
+    <color name="tachiyomi_outline">#7E7389</color>
+    <color name="tachiyomi_outlineVariant">#453B4F</color>
+    <color name="tachiyomi_surfaceContainerLowest">#0F0B13</color>
+    <color name="tachiyomi_surfaceContainerLow">#151019</color>
+    <color name="tachiyomi_surfaceContainer">#18121D</color>
+    <color name="tachiyomi_surfaceContainerHigh">#231B2A</color>
+    <color name="tachiyomi_surfaceContainerHighest">#2E2436</color>
+</resources>

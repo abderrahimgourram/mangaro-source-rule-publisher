@@ -1,0 +1,40 @@
+{
+  "provenance": "Public Keiyoushi source at 60bc15ec9c13b3a4302bc54ca7b9fa892fdae726 and repository index at 9b72f771dd013b30052a20bb77c3ccb12a1a6631; representative public responses sampled 2026-09-28. These are not installed-device or private-database records.",
+  "sources": [
+    {
+      "key": "azora", "name": "Azora", "lang": "ar", "versionId": 2, "sourceId": 2482399499047903203,
+      "mangaUrl": "solo-leveling-ragnarok#1422", "mangaMemo": {"id": 1422, "slug": "solo-leveling-ragnarok"},
+      "chapterUrl": "/series/solo-leveling-ragnarok/chapter-68#89157", "chapterMemo": {"seriesSlug": "solo-leveling-ragnarok", "slug": "chapter-68", "id": 89157},
+      "expectedMangaRequest": "https://api.azorafly.com/api/post?postSlug=solo-leveling-ragnarok", "expectedPageRequest": "https://api.azorafly.com/api/chapter?chapterId=89157"
+    },
+    {
+      "key": "mangadar", "name": "MangaDar", "lang": "ar", "versionId": 1, "sourceId": 3975276517041363504,
+      "mangaUrl": "one-piece", "mangaMemo": {},
+      "chapterUrl": "/manga/one-piece/1194/", "chapterMemo": {},
+      "expectedMangaRequest": "https://mangadar.com/manga/one-piece", "expectedPageRequest": "https://mangadar.com/manga/one-piece/1194/"
+    },
+    {
+      "key": "mangalek", "name": "مانجا ليك", "lang": "ar", "versionId": 1, "sourceId": 918460697583900080,
+      "mangaUrl": null, "mangaMemo": null, "chapterUrl": null, "chapterMemo": null,
+      "expectedMangaRequest": null, "expectedPageRequest": null
+    },
+    {
+      "key": "teamx", "name": "Team X", "lang": "ar", "versionId": 1, "sourceId": 4110737012647435874,
+      "mangaUrl": "/series/fast-break", "mangaMemo": {},
+      "chapterUrl": "/series/fast-break/15", "chapterMemo": {},
+      "expectedMangaRequest": "https://olympustaff.com/series/fast-break", "expectedPageRequest": "https://olympustaff.com/series/fast-break/15"
+    },
+    {
+      "key": "mangatime", "name": "MangaTime", "lang": "ar", "versionId": 1, "sourceId": 215553151312092548,
+      "mangaUrl": "/manga/blue-lock#697df7820c5d340ac154519f", "mangaMemo": {"id": "697df7820c5d340ac154519f", "slug": "blue-lock", "type": "manga"},
+      "chapterUrl": "/manga/blue-lock/chapter/363", "chapterMemo": {},
+      "expectedMangaRequest": "https://mangatime.org/api/trpc/content.getSeriesBySlug", "expectedPageRequest": "https://mangatime.org/api/trpc/content.getChapterPages"
+    },
+    {
+      "key": "hijala", "name": "Hijala", "lang": "ar", "versionId": 2, "sourceId": 917436262447415426,
+      "mangaUrl": "/solo-leveling/", "mangaMemo": {},
+      "chapterUrl": "/solo-leveling-179/", "chapterMemo": {},
+      "expectedMangaRequest": "https://hijala.com/solo-leveling/", "expectedPageRequest": "https://hijala.com/solo-leveling-179/"
+    }
+  ]
+}

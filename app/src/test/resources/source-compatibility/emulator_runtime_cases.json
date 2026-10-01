@@ -1,0 +1,80 @@
+{
+  "fixtureOrigin": "emulator",
+  "serial": "emulator-5554",
+  "applicationCommit": "896c3a422c32a88dd7f5e457da40b3d54c021b70",
+  "publishedIndexCommit": "9b72f771dd013b30052a20bb77c3ccb12a1a6631",
+  "physicalDeviceVerified": false,
+  "cases": [
+    {
+      "source": "Azora",
+      "runtimeSourceId": "2482399499047903203",
+      "storedMangaUrl": "i-am-the-precious-daughter-of-the-greatest-villain-in-the-fantasy-world#702",
+      "storedMangaMemoKeys": ["id", "slug"],
+      "storedChapterUrl": "/series/i-am-the-precious-daughter-of-the-greatest-villain-in-the-fantasy-world/chapter-130#136428",
+      "storedChapterMemoKeys": ["seriesSlug", "slug", "id"],
+      "reloadedPageCount": 17,
+      "origin": "emulator-db-existing"
+    },
+    {
+      "source": "MangaDar",
+      "runtimeSourceId": "3975276517041363504",
+      "storedMangaUrl": "one-piece",
+      "storedMangaMemoKeys": [],
+      "storedChapterUrl": "/manga/one-piece/1194/",
+      "storedChapterMemoKeys": [],
+      "reloadedPageCount": 12,
+      "downloadUrlHashPrefix": "d50692",
+      "downloadState": "failed-data-image-placeholder",
+      "origin": "emulator-ui-pinned-apk"
+    },
+    {
+      "source": "MangaLek",
+      "runtimeSourceId": "918460697583900080",
+      "freshMangaUrl": "775",
+      "freshMangaMemoPath": "/manga/otherworldly-evil-monarch/",
+      "freshChapterUrl": "258",
+      "freshChapterMemoKeys": ["mangaPath"],
+      "freshChapterCount": 257,
+      "storedMangaUrl": "775",
+      "storedMangaMemoPath": "/",
+      "storedChapterCount": 0,
+      "uiResult": "inconclusive-no-chapters-found",
+      "origin": "emulator-source-and-ui-pinned-apk"
+    },
+    {
+      "source": "TeamX",
+      "runtimeSourceId": "4110737012647435874",
+      "storedMangaUrl": "/series/fast-break",
+      "storedMangaMemoKeys": [],
+      "storedChapterUrl": "/series/fast-break/15",
+      "storedChapterMemoKeys": [],
+      "smallListChapterCount": 15,
+      "largeListChapterCount": 1076,
+      "largeListPaginationPages": 27,
+      "downloadUrlHashPrefix": "01ce70",
+      "offlineReader": "pass",
+      "origin": "emulator-ui-pinned-apk"
+    },
+    {
+      "source": "MangaTime",
+      "runtimeSourceId": "215553151312092548",
+      "storedMangaUrl": "/manhwa/nano-machine#697df7690c5d340ac15445b3",
+      "storedMangaMemoKeys": ["id", "slug", "type"],
+      "storedChapterUrl": "/manhwa/nano-machine/chapter/331",
+      "storedChapterMemoKeys": [],
+      "reloadedPageCount": 14,
+      "origin": "emulator-db-existing"
+    },
+    {
+      "source": "Hijala",
+      "runtimeSourceId": "917436262447415426",
+      "sourceMangaUrl": "/solo-leveling/",
+      "sourceChapterUrl": "/solo-leveling-179/",
+      "sourceMemoKeys": [],
+      "sourceChapterCount": 180,
+      "storedChapterUrl": null,
+      "stitchingBranch": "not-tested",
+      "origin": "emulator-source-pinned-apk"
+    }
+  ]
+}

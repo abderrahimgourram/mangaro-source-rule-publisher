@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "description": "Mangaro signed source repair feed. Absent source manifests (404) intentionally retain native BUILT_IN parsers. Verification profiles are isolated under /verification and are never production repairs.",
+  "sources": {
+    "4110737012647435874": {
+      "name": "TeamX",
+      "state": "BUILT_IN",
+      "manifest": "4110737012647435874.json",
+      "publishedRevision": null
+    },
+    "215553151312092548": {
+      "name": "MangaTime",
+      "state": "BUILT_IN",
+      "manifest": "215553151312092548.json",
+      "publishedRevision": null
+    },
+    "918460697583900080": {
+      "name": "MangaLek",
+      "state": "BUILT_IN",
+      "manifest": "918460697583900080.json",
+      "publishedRevision": null
+    },
+    "2482399499047903203": {
+      "name": "Azora",
+      "state": "BUILT_IN",
+      "manifest": "2482399499047903203.json",
+      "publishedRevision": null
+    },
+    "917436262447415426": {
+      "name": "Hijala",
+      "state": "BUILT_IN",
+      "manifest": "917436262447415426.json",
+      "publishedRevision": null
+    },
+    "3975276517041363504": {
+      "name": "MangaDar",
+      "state": "BUILT_IN",
+      "manifest": "3975276517041363504.json",
+      "publishedRevision": null
+    },
+    "7657007209499352344": {
+      "name": "MangaSwat",
+      "state": "BUILT_IN",
+      "manifest": "7657007209499352344.json",
+      "publishedRevision": null
+    }
+  }
+}

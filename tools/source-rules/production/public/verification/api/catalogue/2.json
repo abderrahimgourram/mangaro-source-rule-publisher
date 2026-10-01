@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "id": "feed-m2",
+      "url": "/__feed_m2",
+      "postTitle": "Production Feed Audit 2",
+      "featuredImage": "https://mangaro-source-rules.vercel.app/verification/image.png"
+    }
+  ],
+  "total": 2
+}

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--============-->
+    <!-- Base Theme -->
+    <!--============-->
+
+    <!--== Theme Base ==-->
+    <style name="Base.Theme.Tachiyomi" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Disallow "Force dark theme" -->
+        <item name="android:forceDarkAllowed" tools:targetApi="Q">false</item>
+
+        <!-- Theme Colors -->
+        <item name="colorPrimary">@color/tachiyomi_primary</item>
+        <item name="colorOnPrimary">@color/tachiyomi_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/tachiyomi_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/tachiyomi_onPrimaryContainer</item>
+        <item name="colorPrimaryInverse">@color/tachiyomi_inversePrimary</item>
+        <item name="colorSecondary">@color/tachiyomi_secondary</item>
+        <item name="colorOnSecondary">@color/tachiyomi_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/tachiyomi_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/tachiyomi_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/tachiyomi_tertiary</item>
+        <item name="colorOnTertiary">@color/tachiyomi_onTertiary</item>
+        <item name="colorTertiaryContainer">@color/tachiyomi_tertiaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/tachiyomi_onTertiaryContainer</item>
+        <item name="android:colorBackground">@color/tachiyomi_background</item>
+        <item name="colorOnBackground">@color/tachiyomi_onBackground</item>
+        <item name="colorSurface">@color/tachiyomi_surface</item>
+        <item name="colorOnSurface">@color/tachiyomi_onSurface</item>
+        <item name="colorSurfaceVariant">@color/tachiyomi_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/tachiyomi_onSurfaceVariant</item>
+        <item name="elevationOverlayColor">@color/tachiyomi_surfaceTint</item>
+        <item name="colorSurfaceInverse">@color/tachiyomi_inverseSurface</item>
+        <item name="colorOnSurfaceInverse">@color/tachiyomi_inverseOnSurface</item>
+        <item name="colorError">@color/tachiyomi_error</item>
+        <item name="colorOnError">@color/tachiyomi_onError</item>
+        <item name="colorErrorContainer">@color/tachiyomi_errorContainer</item>
+        <item name="colorOnErrorContainer">@color/tachiyomi_onErrorContainer</item>
+        <item name="colorOutline">@color/tachiyomi_outline</item>
+        <item name="colorOutlineVariant">@color/tachiyomi_outlineVariant</item>
+        <item name="colorSurfaceContainer">@color/tachiyomi_surfaceContainer</item>
+        <item name="colorSurfaceContainerHigh">@color/tachiyomi_surfaceContainerHigh</item>
+        <item name="colorSurfaceContainerHighest">@color/tachiyomi_surfaceContainerHighest</item>
+        <item name="colorSurfaceContainerLow">@color/tachiyomi_surfaceContainerLow</item>
+        <item name="colorSurfaceContainerLowest">@color/tachiyomi_surfaceContainerLowest</item>
+
+        <item name="android:divider">@color/divider_default</item>
+        <item name="android:listDivider">@drawable/line_divider</item>
+        <item name="materialDividerStyle">@style/Widget.Tachiyomi.MaterialDivider</item>
+
+        <!-- Ripples -->
+        <item name="colorControlHighlight">?attr/colorSurfaceVariant</item>
+
+        <!-- Handles RTL Text -->
+        <item name="android:textAlignment">gravity</item>
+        <item name="android:textDirection">locale</item>
+
+        <!-- Themes -->
+        <item name="android:windowLightStatusBar">@bool/lightStatusBar</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/amoled_surface</item>
+        <item name="android:navigationBarDividerColor" tools:targetApi="o_mr1">@null</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="Q">false</item>
+        <item name="android:enforceStatusBarContrast" tools:targetApi="Q">false</item>
+        <item name="android:itemTextAppearance">@style/TextAppearance.Widget.Menu</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Tachiyomi.MaterialAlertDialog</item>
+        <item name="alertDialogTheme">@style/ThemeOverlay.Tachiyomi.MaterialAlertDialog</item>
+        <item name="textAppearanceButton">@style/TextAppearance.Widget.Button</item>
+        <item name="android:buttonStyle">?attr/borderlessButtonStyle</item>
+        <item name="android:backgroundDimAmount">0.32</item>
+        <item name="windowActionModeOverlay">true</item>
+        <item name="actionOverflowButtonStyle">@style/Theme.Tachiyomi.ActionButton.Overflow</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay.Tachiyomi</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="appBarLayoutStyle">@style/Widget.Material3.AppBarLayout</item>
+        <item name="toolbarStyle">@style/Widget.Material3.Toolbar.Surface</item>
+        <item name="switchStyle">@style/Widget.Tachiyomi.Switch</item>
+        <item name="materialSwitchStyle">@style/Widget.Material3.CompoundButton.MaterialSwitch</item>
+        <item name="switchPreferenceCompatStyle">@style/Widget.Tachiyomi.Switch</item>
+        <item name="materialCardViewStyle">@style/Widget.Material3.CardView.Elevated</item>
+
+        <!-- Preference text appearance -->
+        <item name="android:textAppearanceListItem">?attr/textAppearanceBodyLarge</item>
+        <item name="android:textAppearanceListItemSecondary">@style/TextAppearance.Tachiyomi.Preference.Secondary</item>
+    </style>
+
+    <!--== Default Theme ==-->
+    <style name="Theme.Tachiyomi" parent="Base.Theme.Tachiyomi" />
+
+    <!--===============-->
+    <!-- Launch Screen -->
+    <!--===============-->
+
+    <!--== Splash Theme ==-->
+    <style name="Theme.Tachiyomi.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="windowSplashScreenBackground">@color/splash</item>
+        <item name="postSplashScreenTheme">@style/Theme.Tachiyomi</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
+    </style>
+
+</resources>

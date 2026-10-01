@@ -1,0 +1,101 @@
+name: Source rule publisher
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Audit, isolated staging acceptance, or production repair
+        required: true
+        default: audit
+        type: choice
+        options: [audit, staging, production]
+permissions:
+  contents: read
+concurrency:
+  group: mangaro-source-rule-publisher
+  cancel-in-progress: false
+jobs:
+  monitor:
+    # Signing never runs on PRs, forks, or non-default branches.
+    if: github.repository == 'abderrahimgourram/mangaro-source-rule-publisher' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Publisher dependencies
+        run: python -m pip install -r tools/source-rules/automation/requirements.txt
+      - name: Deterministic inference, rejection and isolation tests
+        run: python -m unittest discover -s tools/source-rules/automation -p test_automation.py -v
+      - name: Restore authenticated publisher state
+        if: inputs.mode != 'staging'
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .publisher-state
+          key: mangaro-publisher-state-v1-${{ github.run_id }}
+          restore-keys: mangaro-publisher-state-v1-
+      - name: Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version-file: .github/.java-version
+      - name: Gradle build cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: mangaro-publisher-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
+      - name: Build opt-in production parser audit (no signing secret available)
+        run: ./gradlew -PsourceAudit=true :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Safe staging generation and signed atomic publication
+        if: inputs.mode == 'staging'
+        env:
+          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_STAGING_AUTOMATION_SECRET }}
+          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
+        run: python tools/source-rules/automation/staging_e2e.py --report staging-receipt.json
+      - name: Emulator production path acceptance (emulator-5554 only)
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
+        env:
+          PUBLISHER_MODE: ${{ inputs.mode }}
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -port 5554
+          disable-animations: true
+          script: bash tools/source-rules/automation/emulator-audit.sh
+      - name: Independent monitoring and gated production publishing
+        if: inputs.mode != 'staging'
+        env:
+          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_AUTOMATION_SECRET }}
+          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          AUTOPUBLISH_ENABLED: ${{ vars.MANGARO_AUTOPUBLISH_ENABLED }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python tools/source-rules/automation/ci-monitor.py
+      - name: Save authenticated counters and known identities
+        if: always() && inputs.mode != 'staging' && hashFiles('.publisher-state/*.json') != ''
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .publisher-state
+          key: mangaro-publisher-state-v1-${{ github.run_id }}
+      - name: Publish sanitized summaries only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: publisher-report-${{ github.run_id }}
+          path: |
+            publisher-report.json
+            staging-receipt.json
+            publisher-android-result.txt
+          if-no-files-found: ignore
+          retention-days: 14

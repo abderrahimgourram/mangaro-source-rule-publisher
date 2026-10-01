@@ -1,0 +1,8 @@
+{
+  "post": {
+    "id": "feed-m1",
+    "url": "/__feed_m1",
+    "postTitle": "Production Feed Audit 1",
+    "featuredImage": "https://mangaro-source-rules.vercel.app/verification/image.png"
+  }
+}
