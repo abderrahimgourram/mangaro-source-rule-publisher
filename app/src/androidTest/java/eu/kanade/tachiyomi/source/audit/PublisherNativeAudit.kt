@@ -118,19 +118,31 @@ object PublisherNativeAudit {
                         } }))
                     }
                 }
-                steps["chapters-$i"] = if (update != null && (update!!.chapters.isNotEmpty() || update!!.chapterCompleteness == ChapterFetchCompleteness.COMPLETE)) "PASS_${update!!.chapterCompleteness.name}_${update!!.chapters.size}" else "SEMANTIC_ERROR"
-                if (i == 0) step("reader") {
-                    val chapter = requireNotNull(update).chapters.last()
-                    val pages = source.getPageList(chapter); check(pages.isNotEmpty())
-                    observations += buildJsonObject { put("operation", "pages"); put("chapterUrl", chapter.url); put("chapterMemo", chapter.memo); put("images", JsonArray(pages.map { JsonPrimitive(it.imageUrl.orEmpty()) })) }
-                    operation = "image"
-                    val page = pages.first()
-                    if (page.imageUrl.isNullOrBlank()) page.imageUrl = source.getImageUrl(page)
-                    client.newCall(source.repairImageRequest(page).newBuilder().header("Range", "bytes=0-511").build()).awaitSuccess().use { response ->
-                        check(response.header("Content-Type").orEmpty().startsWith("image/"))
-                        val bytes = response.body.source(); bytes.request(16)
-                        val magic = bytes.readByteArray(minOf(16L, bytes.buffer.size)).toString(Charsets.ISO_8859_1)
-                        check(magic.startsWith("\u00ff\u00d8\u00ff") || magic.startsWith("\u0089PNG") || magic.startsWith("GIF8") || magic.startsWith("RIFF") && magic.contains("WEBP") || magic.contains("ftypavif"))
+                val detailsValid = steps["details-$i"] == "PASS"
+                val chaptersValid = update != null && (update!!.chapters.isNotEmpty() || update!!.chapterCompleteness == ChapterFetchCompleteness.COMPLETE)
+                steps["chapters-$i"] = when {
+                    !detailsValid -> "DEPENDENT_FAILURE"
+                    !chaptersValid -> "SEMANTIC_ERROR"
+                    else -> "PASS_${update!!.chapterCompleteness.name}_${update!!.chapters.size}"
+                }
+                if (i == 0) {
+                    if (steps["details-0"] != "PASS" || steps["chapters-0"]?.startsWith("PASS") != true) {
+                        steps["reader"] = "DEPENDENT_FAILURE"
+                    } else {
+                        step("reader") {
+                            val chapter = requireNotNull(update).chapters.last()
+                            val pages = source.getPageList(chapter); check(pages.isNotEmpty())
+                            observations += buildJsonObject { put("operation", "pages"); put("chapterUrl", chapter.url); put("chapterMemo", chapter.memo); put("images", JsonArray(pages.map { JsonPrimitive(it.imageUrl.orEmpty()) })) }
+                            operation = "image"
+                            val page = pages.first()
+                            if (page.imageUrl.isNullOrBlank()) page.imageUrl = source.getImageUrl(page)
+                            client.newCall(source.repairImageRequest(page).newBuilder().header("Range", "bytes=0-511").build()).awaitSuccess().use { response ->
+                                check(response.header("Content-Type").orEmpty().startsWith("image/"))
+                                val bytes = response.body.source(); bytes.request(16)
+                                val magic = bytes.readByteArray(minOf(16L, bytes.buffer.size)).toString(Charsets.ISO_8859_1)
+                                check(magic.startsWith("\u00ff\u00d8\u00ff") || magic.startsWith("\u0089PNG") || magic.startsWith("GIF8") || magic.startsWith("RIFF") && magic.contains("WEBP") || magic.contains("ftypavif"))
+                            }
+                        }
                     }
                 }
             }

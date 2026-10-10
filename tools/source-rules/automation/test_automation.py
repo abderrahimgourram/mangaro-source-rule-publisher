@@ -94,6 +94,35 @@ class FakeHttp:
         return response({},404)
 
 class AutomationTest(unittest.TestCase):
+    def test_dependent_failure_is_classified_as_unavailable(self):
+        site = Site()
+        state = {'sourceId': ID, 'failures': 2}
+        native = {
+            'sourceId': ID,
+            'steps': {'popular': 'PASS', 'details-0': 'DEPENDENT_FAILURE'},
+            'diagnostics': {}
+        }
+        controller = Controller(site.http, site.publish)
+        new_state, report = controller.run({'sourceId': ID, 'name': 'diagnostic'}, state, native=native)
+        self.assertEqual(report['health'], 'UNAVAILABLE')
+        self.assertEqual(report['result'], 'REQUIRES_COMPILED_UPDATE')
+        self.assertEqual(report['operation'], 'details-0')
+        self.assertEqual(new_state['failures'], 3)
+
+    def test_dependent_failure_prefers_semantic_error_as_operation(self):
+        site = Site()
+        state = {'sourceId': ID, 'failures': 2}
+        native = {
+            'sourceId': ID,
+            'steps': {'popular': 'SEMANTIC_ERROR', 'details-0': 'DEPENDENT_FAILURE'},
+            'diagnostics': {}
+        }
+        controller = Controller(site.http, site.publish)
+        new_state, report = controller.run({'sourceId': ID, 'name': 'diagnostic'}, state, native=native)
+        self.assertEqual(report['health'], 'UNAVAILABLE')
+        self.assertEqual(report['result'], 'REQUIRES_COMPILED_UPDATE')
+        self.assertEqual(report['operation'], 'popular')
+
     def baseline(self,site,r=None):
         r=r or profile(); return {'baseline':copy.deepcopy(r),'witness':validate(r,site.http()),'evidence':capture(r,site.http())}
     def repair(self,change,r=None):

@@ -54,7 +54,8 @@ class Controller:
         if rules is None:
             if native is None: return new,report|{'result':'NATIVE_AUDIT_REQUIRED'}
             steps=native.get('steps',{})
-            failures=[k for k,v in steps.items() if v=='SEMANTIC_ERROR']
+            FAILURE_STATES = {'SEMANTIC_ERROR', 'DEPENDENT_FAILURE'}
+            failures=[k for k,v in steps.items() if v in FAILURE_STATES]
             transient=any(v.startswith('TRANSIENT') for v in steps.values())
             report['nativeSteps']=steps
             report['nativeDiagnostics']=native.get('diagnostics',{})
@@ -80,7 +81,12 @@ class Controller:
                 return new,report|{'result':'TRANSIENT_NO_REPAIR'}
             new['failures']=new.get('failures',0)+1
             if new['failures']<THRESHOLD: return new,report|{'result':'FAILURE_PENDING','failureCount':new['failures']}
-            return new,report|{'health':'UNAVAILABLE','result':'REQUIRES_COMPILED_UPDATE','reason':new.get('nativeCapability','NATIVE_BASELINE_NOT_SAFELY_DECLARABLE'),'operation':failures[0] if failures else 'unknown'}
+
+            # Prefer SEMANTIC_ERROR over DEPENDENT_FAILURE for the reported failure operation reason
+            semantic_failures = [k for k, v in steps.items() if v == 'SEMANTIC_ERROR']
+            primary_failure = semantic_failures[0] if semantic_failures else (failures[0] if failures else 'unknown')
+
+            return new,report|{'health':'UNAVAILABLE','result':'REQUIRES_COMPILED_UPDATE','reason':new.get('nativeCapability','NATIVE_BASELINE_NOT_SAFELY_DECLARABLE'),'operation':primary_failure}
         try:
             verified=validate(rules,self.http_factory(),new.get('witness'))
             new['baseline']=rules; new['witness']=verified; new['evidence']=capture(rules,self.http_factory()); new['failures']=0

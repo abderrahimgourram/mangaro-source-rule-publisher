@@ -145,13 +145,91 @@ class MangaStarzParserTest {
             .body(sampleDetailsHtml.toResponseBody("text/html".toMediaTypeOrNull()))
             .build()
 
+        val inputManga = SManga.create().apply { url = "/manga/solo-leveling/" }
+
+        // Simulating fetchMangaDetails logic to assign url since it's now internal to the Observable
         val manga = source.mangaDetailsParse(response)
+
+        // Test identity validation from the internal method
+        val validateMethod = source.javaClass.getDeclaredMethod("validateAndSetMangaUrl", SManga::class.java, String::class.java, String::class.java)
+        validateMethod.isAccessible = true
+        validateMethod.invoke(source, manga, inputManga.url, response.request.url.toString())
+
+        manga.url shouldBe "/manga/solo-leveling/"
         manga.title shouldBe "Solo Leveling"
         manga.thumbnail_url shouldBe "https://tempmanhwa.starzmanga.com/covers/solo-leveling.jpg"
         manga.description shouldBe "In a world where hunters must battle deadly monsters, a weak hunter gets a second chance."
         manga.author shouldBe "Chugong"
         manga.status shouldBe SManga.COMPLETED
         manga.genre shouldBe "Action, Fantasy"
+    }
+
+    @Test
+    fun testMangaIdentityMismatch() {
+        val inputManga = SManga.create().apply { url = "/manga/my-fake-manga/" }
+        val manga = SManga.create()
+
+        val validateMethod = source.javaClass.getDeclaredMethod("validateAndSetMangaUrl", SManga::class.java, String::class.java, String::class.java)
+        validateMethod.isAccessible = true
+
+        val exception = assertThrows<java.lang.reflect.InvocationTargetException> {
+            validateMethod.invoke(source, manga, inputManga.url, "https://starzmanga.com/manga/solo-leveling/")
+        }
+
+        val rootCause = exception.targetException
+        rootCause.javaClass shouldBe IOException::class.java
+        rootCause.message shouldBe "Manga identity mismatch: requested my-fake-manga but got solo-leveling"
+    }
+
+    @Test
+    fun testMangaIdentitySubstringCollision() {
+        val inputManga = SManga.create().apply { url = "/manga/leveling/" }
+        val manga = SManga.create()
+
+        val validateMethod = source.javaClass.getDeclaredMethod("validateAndSetMangaUrl", SManga::class.java, String::class.java, String::class.java)
+        validateMethod.isAccessible = true
+
+        val exception = assertThrows<java.lang.reflect.InvocationTargetException> {
+            validateMethod.invoke(source, manga, inputManga.url, "https://starzmanga.com/manga/solo-leveling/")
+        }
+
+        val rootCause = exception.targetException
+        rootCause.javaClass shouldBe IOException::class.java
+        rootCause.message shouldBe "Manga identity mismatch: requested leveling but got solo-leveling"
+    }
+
+    @Test
+    fun testMangaIdentitySameDomainRedirect() {
+        val inputManga = SManga.create().apply { url = "/manga/solo-leveling/" }
+        val manga = SManga.create()
+
+        val validateMethod = source.javaClass.getDeclaredMethod("validateAndSetMangaUrl", SManga::class.java, String::class.java, String::class.java)
+        validateMethod.isAccessible = true
+
+        val exception = assertThrows<java.lang.reflect.InvocationTargetException> {
+            validateMethod.invoke(source, manga, inputManga.url, "https://starzmanga.com/manga/solo-leveling-new/")
+        }
+
+        val rootCause = exception.targetException
+        rootCause.javaClass shouldBe IOException::class.java
+        rootCause.message shouldBe "Manga identity mismatch: requested solo-leveling but got solo-leveling-new"
+    }
+
+    @Test
+    fun testMangaIdentityBlankUrl() {
+        val inputManga = SManga.create().apply { url = "/manga/solo-leveling/" }
+        val manga = SManga.create()
+
+        val validateMethod = source.javaClass.getDeclaredMethod("validateAndSetMangaUrl", SManga::class.java, String::class.java, String::class.java)
+        validateMethod.isAccessible = true
+
+        val exception = assertThrows<java.lang.reflect.InvocationTargetException> {
+            validateMethod.invoke(source, manga, inputManga.url, "")
+        }
+
+        val rootCause = exception.targetException
+        rootCause.javaClass shouldBe IOException::class.java
+        rootCause.message shouldBe "Manga identity mismatch: empty fetched URL"
     }
 
     @Test
@@ -176,6 +254,64 @@ class MangaStarzParserTest {
         second.name shouldBe "فصل 178"
         second.url shouldBe "/manga/solo-leveling/chapter-178/"
         second.chapter_number shouldBe 178f
+    }
+
+    @Test
+    fun testParseChaptersExternalMangaLekLinksRejected() {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head><title>Solo Leveling - Chapters</title></head>
+            <body>
+                <ul class="main version-chap">
+                    <li class="wp-manga-chapter">
+                        <a href="https://mangalik.net/manga/solo-leveling/chapter-179/">فصل 179</a>
+                    </li>
+                </ul>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val response = Response.Builder()
+            .request(Request.Builder().url("https://starzmanga.com/manga/solo-leveling/").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body(html.toResponseBody("text/html".toMediaTypeOrNull()))
+            .build()
+
+        assertThrows<IOException> {
+            source.chapterListParse(response)
+        }
+    }
+
+    @Test
+    fun testParseChaptersIdentityMismatchLinksRejected() {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head><title>Solo Leveling - Chapters</title></head>
+            <body>
+                <ul class="main version-chap">
+                    <li class="wp-manga-chapter">
+                        <a href="https://starzmanga.com/manga/wrong-manga/chapter-1/">فصل 1</a>
+                    </li>
+                </ul>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val response = Response.Builder()
+            .request(Request.Builder().url("https://starzmanga.com/manga/solo-leveling/").build())
+            .protocol(Protocol.HTTP_1_1)
+            .code(200)
+            .message("OK")
+            .body(html.toResponseBody("text/html".toMediaTypeOrNull()))
+            .build()
+
+        assertThrows<IOException> {
+            source.chapterListParse(response)
+        }
     }
 
     @Test

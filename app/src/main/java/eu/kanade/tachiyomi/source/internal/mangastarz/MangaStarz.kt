@@ -212,19 +212,41 @@ class MangaStarz(
             val request = mangaDetailsRequest(manga)
             try {
                 val response = client.newCall(request).execute()
-                mangaDetailsParse(response).apply { initialized = true }
+                val parsed = mangaDetailsParse(response)
+                validateAndSetMangaUrl(parsed, manga.url, response.request.url.toString())
+                parsed.apply { initialized = true }
             } catch (e: Exception) {
                 val context = runCatching { application.applicationContext }.getOrNull()
                 if (context != null) {
                     val fullUrl = if (manga.url.startsWith("http")) manga.url else "$baseUrl${manga.url}"
                     val headersMap = headers.toMultimap().mapValues { it.value.firstOrNull().orEmpty() }
                     val doc = runBlocking { MangaStarzHtmlFetcher.fetchDocument(context, fullUrl, headersMap) }
-                    parseMangaDetailsFromDocument(doc).apply { initialized = true }
+                    val parsed = parseMangaDetailsFromDocument(doc)
+                    validateAndSetMangaUrl(parsed, manga.url, doc.location())
+                    parsed.apply { initialized = true }
                 } else {
                     throw e
                 }
             }
         }
+    }
+
+    private fun validateAndSetMangaUrl(parsed: SManga, requestedUrl: String, fetchedUrl: String) {
+        if (fetchedUrl.isBlank()) throw IOException("Manga identity mismatch: empty fetched URL")
+        val uri = try { URI(fetchedUrl) } catch (_: Exception) { throw IOException("Manga identity mismatch: malformed fetched URL $fetchedUrl") }
+        if (uri.scheme?.lowercase() != "https") throw IOException("Manga identity mismatch: non-HTTPS fetched URL $fetchedUrl")
+        if (uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") {
+            throw IOException("Cross-source domain contamination detected: $fetchedUrl is not starzmanga.com")
+        }
+
+        val reqSlug = try { java.net.URLDecoder.decode(requestedUrl.removeSuffix("/").substringAfterLast("/"), "UTF-8") } catch (_: Exception) { requestedUrl.removeSuffix("/").substringAfterLast("/") }
+        val fetchSlug = try { java.net.URLDecoder.decode(fetchedUrl.removeSuffix("/").substringAfterLast("/"), "UTF-8") } catch (_: Exception) { fetchedUrl.removeSuffix("/").substringAfterLast("/") }
+
+        if (reqSlug.isBlank() || fetchSlug.isBlank() || reqSlug != fetchSlug) {
+            throw IOException("Manga identity mismatch: requested $reqSlug but got $fetchSlug")
+        }
+
+        parsed.url = requestedUrl
     }
 
     override fun mangaDetailsRequest(manga: SManga): Request {
@@ -295,12 +317,13 @@ class MangaStarz(
     public override fun chapterListParse(response: Response): List<SChapter> {
         return response.use {
             val document = it.asJsoup()
-            parseChapterListFromDocument(document)
+            parseChapterListFromDocument(document, it.request.url.toString())
         }
     }
 
-    fun parseChapterListFromDocument(document: Document): List<SChapter> {
+    fun parseChapterListFromDocument(document: Document, documentUrl: String = document.location()): List<SChapter> {
         checkMangaStarzOrigin(document)
+        val mangaSlug = try { java.net.URLDecoder.decode(documentUrl.removeSuffix("/").substringAfterLast("/"), "UTF-8") } catch (_: Exception) { documentUrl.removeSuffix("/").substringAfterLast("/") }
 
         val chapterElements = document.select("li.wp-manga-chapter, .wp-manga-chapter, #chapterlist ul li, .eplister ul li")
 
@@ -313,8 +336,11 @@ class MangaStarz(
             val relativeUrl = try {
                 val uri = URI(href)
                 if (uri.host != null && uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") continue
+                if (uri.scheme?.lowercase() != "https") continue
+                if (mangaSlug.isNotBlank() && !java.net.URLDecoder.decode(uri.path, "UTF-8").contains(mangaSlug)) continue
                 uri.path
             } catch (_: Exception) {
+                if (mangaSlug.isNotBlank() && !java.net.URLDecoder.decode(href, "UTF-8").contains(mangaSlug)) continue
                 href.removePrefix(baseUrl)
             }
 
@@ -337,14 +363,17 @@ class MangaStarz(
         if (chapters.isEmpty()) {
             val mangaId = document.selectFirst("div#manga-chapters-holder")?.attr("data-id")
             if (!mangaId.isNullOrBlank()) {
-                return fetchChaptersViaAjax(mangaId)
+                val ajaxChapters = fetchChaptersViaAjax(mangaId, mangaSlug)
+                if (ajaxChapters.isEmpty()) throw IOException("Manga Starz page list is empty or protected")
+                return ajaxChapters
             }
+            throw IOException("Manga Starz page list is empty or protected")
         }
 
         return chapters
     }
 
-    private fun fetchChaptersViaAjax(mangaId: String): List<SChapter> {
+    private fun fetchChaptersViaAjax(mangaId: String, mangaSlug: String): List<SChapter> {
         val formBody = FormBody.Builder()
             .add("action", "manga_get_chapters")
             .add("manga", mangaId)
@@ -358,7 +387,18 @@ class MangaStarz(
                 val href = link.attr("abs:href").ifBlank { link.attr("href") }
                 if (href.isBlank()) return@mapNotNull null
 
-                val relativeUrl = try { URI(href).path } catch (_: Exception) { href.removePrefix(baseUrl) }
+                val relativeUrl = try {
+                    val uri = URI(href)
+                    if (uri.host != null && uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") {
+                        return@mapNotNull null
+                    }
+                    if (uri.scheme?.lowercase() != "https") return@mapNotNull null
+                    if (mangaSlug.isNotBlank() && !java.net.URLDecoder.decode(uri.path, "UTF-8").contains(mangaSlug)) return@mapNotNull null
+                    uri.path
+                } catch (_: Exception) {
+                    if (mangaSlug.isNotBlank() && !java.net.URLDecoder.decode(href, "UTF-8").contains(mangaSlug)) return@mapNotNull null
+                    href.removePrefix(baseUrl)
+                }
                 val chapterName = link.text().trim()
                 val dateText = element.selectFirst("span.chapter-release-date i, .chapterdate")?.text()?.trim()
 

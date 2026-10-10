@@ -31,12 +31,12 @@ object MangaStarzHtmlFetcher {
         if (!isValidOrigin(url)) {
             throw IOException("Manga Starz invalid target URL origin: $url")
         }
-        val html = fetchHtml(context, url, headers)
-        return Jsoup.parse(html, url)
+        val (html, finalUrl) = fetchHtml(context, url, headers)
+        return Jsoup.parse(html, finalUrl)
     }
 
-    private suspend fun fetchHtml(context: Context, url: String, headers: Map<String, String>): String = withContext(Dispatchers.Main) {
-        val deferred = CompletableDeferred<String>()
+    private suspend fun fetchHtml(context: Context, url: String, headers: Map<String, String>): Pair<String, String> = withContext(Dispatchers.Main) {
+        val deferred = CompletableDeferred<Pair<String, String>>()
         var webView: WebView? = null
         try {
             webView = WebView(context).apply {
@@ -71,7 +71,7 @@ object MangaStarzHtmlFetcher {
                         rawHtml.contains("reading-content")
                     ) {
                         finished = true
-                        deferred.complete(rawHtml)
+                        deferred.complete(Pair(rawHtml, currentUrl))
                     }
                 }
             }
