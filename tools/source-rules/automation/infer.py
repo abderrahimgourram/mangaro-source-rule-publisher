@@ -242,6 +242,9 @@ def compile_native(evidence):
     # Preserve dates/names/memo exactly; ISO-date conversion and generated labels cannot be
     # declared in schema 1. Direct mappings are compiled only by exact observed equality.
     traces=evidence.get('traces',[])
+    if evidence.get('sourceId')==6058166507489091982 or evidence.get('diagnostics',{}).get('transport')=='WEBVIEW':
+        html_traces=[t for t in traces if t.get('status')==200 and 'body' in t and ('<html' in str(t.get('body')).lower() or 'page-item-detail' in str(t.get('body')) or 'items' in str(t.get('body')) or 'post' in str(t.get('body')))]
+        if not html_traces: raise Unsafe('UNOBSERVED_WEBVIEW_TRANSPORT')
     parsed=[]
     for t in traces:
         if t['status']!=200: continue

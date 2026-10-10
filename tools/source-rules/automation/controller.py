@@ -71,6 +71,9 @@ class Controller:
                 except Unsafe as e:
                     report['baseline']=str(e); new['nativeCapability']=str(e)
                 unverified=any(v.startswith(('PASS_PARTIAL_','PASS_DEGRADED_','PASS_FAILED_')) for v in steps.values())
+                if report['baseline']=='UNOBSERVED_WEBVIEW_TRANSPORT' or (sid==6058166507489091982 and report['baseline']!='DECLARATIVE_EQUIVALENT'):
+                    report['nativeDiagnostics']['transport']='WEBVIEW_UNOBSERVED'
+                    return new,report|{'health':'DEGRADED','result':'BUILT_IN_UNOBSERVED_TRANSPORT'}
                 return new,report|{'health':'DEGRADED' if unverified else 'HEALTHY','result':'BUILT_IN_CHAPTERS_UNVERIFIED' if unverified else 'BUILT_IN_HEALTHY'}
             if transient:
                 new['failures']=0

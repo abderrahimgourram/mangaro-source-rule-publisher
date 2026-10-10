@@ -318,6 +318,81 @@ class PublicationGateTest(unittest.TestCase):
         self.assertEqual(self.promotes,1)
         self.assertEqual(self.site.index['sources'][str(ID-1)]['publishedRevision'],1)
         self.assertEqual(self.site.index['sources'][str(ID-1)]['state'],'SIGNED_REPAIR_AVAILABLE')
+
+    def test_manga_starz_webview_unobserved_transport_produces_degraded(self):
+        starz_id = 6058166507489091982
+        source = {'sourceId': starz_id, 'name': 'Manga Starz'}
+        state = {'sourceId': starz_id}
+        native = {
+            'sourceId': starz_id,
+            'steps': {'popular': 'PASS', 'latest': 'PASS', 'search': 'PASS', 'details': 'PASS', 'chapters': 'PASS', 'pages': 'PASS'},
+            'diagnostics': {'transport': 'WEBVIEW'},
+            'traces': []
+        }
+        controller = Controller(self.site.http, self.site.publish)
+        new_state, report = controller.run(source, state, native=native)
+        self.assertEqual(report['health'], 'DEGRADED')
+        self.assertEqual(report['result'], 'BUILT_IN_UNOBSERVED_TRANSPORT')
+        self.assertEqual(report['nativeDiagnostics']['transport'], 'WEBVIEW_UNOBSERVED')
+        self.assertIsNone(new_state.get('baseline'))
+
+    def test_manga_starz_fail_closed_prevents_declarative_publication(self):
+        starz_id = 6058166507489091982
+        source = {'sourceId': starz_id, 'name': 'Manga Starz'}
+        state = {'sourceId': starz_id}
+        native = {
+            'sourceId': starz_id,
+            'baseUrl': BASE,
+            'steps': {'popular': 'PASS', 'latest': 'PASS', 'search': 'PASS', 'details': 'PASS', 'chapters': 'PASS', 'pages': 'PASS'},
+            'observations': [
+                {'operation': 'popular', 'mangas': [self.site.manga(1), self.site.manga(2)]},
+                {'operation': 'latest', 'mangas': [self.site.manga(3), self.site.manga(4)]},
+                {'operation': 'search', 'mangas': [self.site.manga(1)]},
+                {'operation': 'details', 'input': self.site.manga(1), 'manga': self.site.manga(1), 'chapters': [{'id': 'm1-c1', 'url': '/m1/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'details', 'input': self.site.manga(2), 'manga': self.site.manga(2), 'chapters': [{'id': 'm2-c1', 'url': '/m2/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'details', 'input': self.site.manga(3), 'manga': self.site.manga(3), 'chapters': [{'id': 'm3-c1', 'url': '/m3/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'pages', 'chapterUrl': '/m1/c1', 'chapterMemo': {}, 'images': [BASE + '/a.png']}
+            ],
+            'traces': [
+                {'operation': 'popular', 'url': BASE + '/popular?page=1', 'status': 200, 'body': '<html><body><div class="page-item-detail"><a href="/m1">Title 1</a></div></body></html>'},
+            ]
+        }
+        controller = Controller(self.site.http, self.site.publish)
+        new_state, report = controller.run(source, state, native=native)
+        self.assertEqual(report['health'], 'DEGRADED')
+        self.assertEqual(report['result'], 'BUILT_IN_UNOBSERVED_TRANSPORT')
+        self.assertEqual(report['nativeDiagnostics']['transport'], 'WEBVIEW_UNOBSERVED')
+        self.assertIsNone(new_state.get('baseline'))
+
+    def test_other_sources_unaffected(self):
+        site = Site()
+        source = {'sourceId': ID, 'name': 'Test Source'}
+        state = {'sourceId': ID}
+        native = {
+            'sourceId': ID,
+            'baseUrl': BASE,
+            'steps': {'popular': 'PASS', 'latest': 'PASS', 'search': 'PASS', 'details': 'PASS', 'chapters': 'PASS', 'pages': 'PASS'},
+            'observations': [
+                {'operation': 'popular', 'mangas': [site.manga(1), site.manga(2)]},
+                {'operation': 'latest', 'mangas': [site.manga(3), site.manga(4)]},
+                {'operation': 'search', 'mangas': [site.manga(1)]},
+                {'operation': 'details', 'input': site.manga(1), 'manga': site.manga(1), 'chapters': [{'id': 'm1-c1', 'url': '/m1/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'details', 'input': site.manga(2), 'manga': site.manga(2), 'chapters': [{'id': 'm2-c1', 'url': '/m2/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'details', 'input': site.manga(3), 'manga': site.manga(3), 'chapters': [{'id': 'm3-c1', 'url': '/m3/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}], 'completeness': 'COMPLETE'},
+                {'operation': 'pages', 'chapterUrl': '/m1/c1', 'chapterMemo': {}, 'images': [BASE + '/a.png']}
+            ],
+            'traces': [
+                {'operation': 'popular', 'url': BASE + '/popular?page=1', 'status': 200, 'body': json.dumps({'items': [site.manga(1), site.manga(2)], 'total': 2})},
+                {'operation': 'latest', 'url': BASE + '/latest?page=1', 'status': 200, 'body': json.dumps({'items': [site.manga(3), site.manga(4)], 'total': 2})},
+                {'operation': 'search', 'url': BASE + '/search?q=Title+1&page=1', 'status': 200, 'body': json.dumps({'items': [site.manga(1)], 'total': 1})},
+                {'operation': 'details-0', 'url': BASE + '/details/m1', 'status': 200, 'body': json.dumps({'post': site.manga(1), 'chapters': [{'id': 'm1-c1', 'url': '/m1/c1', 'name': 'Chapter 1', 'number': 1.0, 'date': 0, 'scanlator': ''}]})},
+                {'operation': 'reader', 'url': BASE + '/pages/m1-c1', 'status': 200, 'body': json.dumps({'pages': [BASE + '/a.png']})}
+            ]
+        }
+        controller = Controller(site.http, site.publish)
+        new_state, report = controller.run(source, state, native=native)
+        self.assertEqual(report['health'], 'HEALTHY')
+        self.assertEqual(report['result'], 'BUILT_IN_HEALTHY')
     def test_staged_index_tampering_cannot_promote(self):
         self.tamper_index=True
         candidate=profile();candidate['revision']=2
