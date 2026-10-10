@@ -57,6 +57,17 @@ class MangaStarz(
         .add("Accept-Language", "ar,en-US;q=0.9,en;q=0.8")
         .add("Referer", "$baseUrl/")
 
+    private fun checkMangaStarzOrigin(document: Document) {
+        SourceValidationUtil.checkCloudflareOrError(document)
+        val location = document.location().orEmpty().lowercase()
+        if (location.isNotBlank()) {
+            val uri = try { URI(location) } catch (_: Exception) { null }
+            if (uri != null && uri.host != null && uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") {
+                throw IOException("Cross-source domain contamination detected: $location is not starzmanga.com")
+            }
+        }
+    }
+
     override suspend fun getPopularManga(page: Int): MangasPage {
         val request = popularMangaRequest(page)
         return try {
@@ -150,7 +161,7 @@ class MangaStarz(
     }
 
     fun parseMangaListFromDocument(document: Document): MangasPage {
-        SourceValidationUtil.checkCloudflareOrError(document)
+        checkMangaStarzOrigin(document)
 
         val elements = document.select(".page-item-detail.manga, div.page-item-detail, .c-tabs-item__content, .manga-item, .listupd .bs .bsx, .bs .bsx")
             .ifEmpty { document.select("div.post-title") }
@@ -166,10 +177,11 @@ class MangaStarz(
                 ?: continue
 
             val href = titleElement.attr("abs:href").ifBlank { titleElement.attr("href") }
-            if (href.isBlank() || !href.contains("/manga/") || href == "$baseUrl/manga/" || href == "$baseUrl/manga") continue
+            if (href.isBlank() || (!href.contains("starzmanga.com/manga/") && !href.startsWith("/manga/"))) continue
 
             val relativeUrl = try {
                 val uri = URI(href)
+                if (uri.host != null && uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") continue
                 uri.path.removeSuffix("/")
             } catch (_: Exception) {
                 href.removePrefix(baseUrl).removeSuffix("/")
@@ -228,7 +240,7 @@ class MangaStarz(
     }
 
     fun parseMangaDetailsFromDocument(document: Document): SManga {
-        SourceValidationUtil.checkCloudflareOrError(document)
+        checkMangaStarzOrigin(document)
 
         val manga = SManga.create()
 
@@ -288,7 +300,7 @@ class MangaStarz(
     }
 
     fun parseChapterListFromDocument(document: Document): List<SChapter> {
-        SourceValidationUtil.checkCloudflareOrError(document)
+        checkMangaStarzOrigin(document)
 
         val chapterElements = document.select("li.wp-manga-chapter, .wp-manga-chapter, #chapterlist ul li, .eplister ul li")
 
@@ -299,7 +311,9 @@ class MangaStarz(
             if (href.isBlank()) continue
 
             val relativeUrl = try {
-                URI(href).path
+                val uri = URI(href)
+                if (uri.host != null && uri.host != "starzmanga.com" && uri.host != "www.starzmanga.com") continue
+                uri.path
             } catch (_: Exception) {
                 href.removePrefix(baseUrl)
             }
@@ -406,7 +420,7 @@ class MangaStarz(
     }
 
     fun parsePageListFromDocument(document: Document): List<Page> {
-        SourceValidationUtil.checkCloudflareOrError(document)
+        checkMangaStarzOrigin(document)
 
         val imgElements = document.select(".reading-content img, .page-break img, #readerarea img")
 

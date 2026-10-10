@@ -15,10 +15,22 @@ import org.json.JSONObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.IOException
+import java.net.URI
 
 object MangaStarzHtmlFetcher {
 
+    fun isValidOrigin(urlStr: String?): Boolean {
+        if (urlStr.isNullOrBlank()) return false
+        val uri = try { URI(urlStr) } catch (_: Exception) { return false }
+        val scheme = uri.scheme?.lowercase()
+        val host = uri.host?.lowercase()
+        return scheme == "https" && (host == "starzmanga.com" || host == "www.starzmanga.com")
+    }
+
     suspend fun fetchDocument(context: Context, url: String, headers: Map<String, String>): Document {
+        if (!isValidOrigin(url)) {
+            throw IOException("Manga Starz invalid target URL origin: $url")
+        }
         val html = fetchHtml(context, url, headers)
         return Jsoup.parse(html, url)
     }
@@ -36,8 +48,12 @@ object MangaStarzHtmlFetcher {
             var finished = false
 
             fun checkHtml() {
-                if (finished || webView == null) return
-                webView?.evaluateJavascript("document.documentElement.outerHTML") { htmlJson ->
+                val currentView = webView ?: return
+                if (finished) return
+                val currentUrl = currentView.url.orEmpty()
+                if (!isValidOrigin(currentUrl)) return
+
+                currentView.evaluateJavascript("document.documentElement.outerHTML") { htmlJson ->
                     if (finished || htmlJson.isNullOrBlank() || htmlJson == "null" || htmlJson == "\"\"") return@evaluateJavascript
                     val rawHtml = try {
                         if (htmlJson.startsWith("\"") && htmlJson.endsWith("\"")) {
@@ -52,9 +68,7 @@ object MangaStarzHtmlFetcher {
                     if (rawHtml.contains("page-item-detail") ||
                         rawHtml.contains("post-title") ||
                         rawHtml.contains("wp-manga-chapter") ||
-                        rawHtml.contains("reading-content") ||
-                        rawHtml.contains("item-thumb") ||
-                        rawHtml.contains("site-content")
+                        rawHtml.contains("reading-content")
                     ) {
                         finished = true
                         deferred.complete(rawHtml)
@@ -65,12 +79,16 @@ object MangaStarzHtmlFetcher {
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, loadedUrl: String?) {
                     CookieManager.getInstance().flush()
-                    checkHtml()
+                    if (isValidOrigin(loadedUrl)) {
+                        checkHtml()
+                    }
                 }
 
                 override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
                     if (request?.isForMainFrame == true && errorResponse?.statusCode == 403) {
-                        checkHtml()
+                        if (isValidOrigin(request.url?.toString())) {
+                            checkHtml()
+                        }
                     }
                 }
             }

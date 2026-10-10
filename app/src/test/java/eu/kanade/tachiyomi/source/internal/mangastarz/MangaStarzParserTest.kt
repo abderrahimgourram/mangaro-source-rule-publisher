@@ -10,6 +10,8 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.jsoup.Jsoup
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import java.io.IOException
 
 class MangaStarzParserTest {
 
@@ -192,5 +194,71 @@ class MangaStarzParserTest {
         pages[0].imageUrl shouldBe "https://tempmanhwa.starzmanga.com/pages/c179/001.jpg"
         pages[1].imageUrl shouldBe "https://tempmanhwa.starzmanga.com/pages/c179/002.jpg"
         pages[2].imageUrl shouldBe "https://tempmanhwa.starzmanga.com/pages/c179/003.jpg"
+    }
+
+    @Test
+    fun testWrongDomainDocumentRejected() {
+        val doc = Jsoup.parse("<html><body><div class='page-item-detail manga'><a href='https://mangalik.net/manga/test'>Test</a></div></body></html>", "https://mangalik.net/manga/")
+        assertThrows<IOException> {
+            source.parseMangaListFromDocument(doc)
+        }
+    }
+
+    @Test
+    fun testMisleadingHostnameLinksRejected() {
+        val html = """
+            <div class="c-tabs-item__content">
+                <div class="page-item-detail manga">
+                    <div class="post-title">
+                        <a href="https://starzmanga.com.fake.com/manga/fake-title/">Fake Manga</a>
+                    </div>
+                </div>
+            </div>
+        """.trimIndent()
+        val doc = Jsoup.parse(html, "https://starzmanga.com")
+        val page = source.parseMangaListFromDocument(doc)
+        page.mangas shouldHaveSize 0
+    }
+
+    @Test
+    fun testMangaLekHtmlWithStarzStringEmbeddedRejected() {
+        val html = """
+            <!-- Related site: starzmanga.com -->
+            <div class="page-item-detail manga">
+                <div class="post-title">
+                    <a href="https://mangalik.net/manga/other-manga/">MangaLek Title</a>
+                </div>
+            </div>
+        """.trimIndent()
+        val doc = Jsoup.parse(html, "https://mangalik.net/manga/")
+        assertThrows<IOException> {
+            source.parseMangaListFromDocument(doc)
+        }
+    }
+
+    @Test
+    fun testCloudflareChallengeHtmlRejected() {
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head><title>Just a moment...</title></head>
+            <body>
+                <div id="challenge-error-title">Enable JavaScript to continue</div>
+            </body>
+            </html>
+        """.trimIndent()
+        val doc = Jsoup.parse(html, "https://starzmanga.com")
+        assertThrows<IOException> {
+            source.parseMangaListFromDocument(doc)
+        }
+    }
+
+    @Test
+    fun testOriginValidationHelper() {
+        MangaStarzHtmlFetcher.isValidOrigin("https://starzmanga.com") shouldBe true
+        MangaStarzHtmlFetcher.isValidOrigin("https://www.starzmanga.com/manga/solo-leveling/") shouldBe true
+        MangaStarzHtmlFetcher.isValidOrigin("http://starzmanga.com") shouldBe false
+        MangaStarzHtmlFetcher.isValidOrigin("https://starzmanga.com.fake.com") shouldBe false
+        MangaStarzHtmlFetcher.isValidOrigin("https://mangalik.net") shouldBe false
     }
 }
