@@ -218,14 +218,21 @@ class PublicationGateTest(unittest.TestCase):
     def setUp(self):
         from automation.publisher import VercelPublisher
         self.site=Site();self.feed='https://feed-test.example';self.staged=None;self.promotes=0;self.tamper=False;self.concurrent=False
+        self.tamper_index=False;self.concurrent_index=False
         self.key=ec.generate_private_key(ec.SECP256R1())
         self.pem=self.key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())
         self.public=base64.b64encode(self.key.public_key().public_bytes(serialization.Encoding.DER,serialization.PublicFormat.SubjectPublicKeyInfo)).decode()
         old=profile();other=copy.deepcopy(old);other['sourceId']=ID-1
         self.site.public={ID:sign(old,self.pem,self.public),ID-1:sign(other,self.pem,self.public)}
+        self.site.index={'schema':1,'sources':{
+            str(x):{'name':str(x),'state':'BUILT_IN','manifest':str(x)+'.json','publishedRevision':None}
+            for x in (ID,ID-1)
+        }}
         test=self
         class Transport(FakeHttp):
             def get(self,url,*args,**kwargs):
+                if url==test.feed+'/index.json':
+                    return Response(url,200,canonical(test.site.index).encode(),{})
                 if url.startswith(test.feed+'/'):
                     sid=int(urlsplit(url).path[1:].split('.')[0]);value=test.site.public.get(sid)
                     return Response(url,200 if value else 404,canonical(value).encode(),{})
@@ -233,19 +240,28 @@ class PublicationGateTest(unittest.TestCase):
         class Publisher(VercelPublisher):
             def command(self,args,cwd):
                 if args[0]=='deploy':
-                    test.staged={int(p.stem):json.loads(p.read_text()) for p in (cwd/'public').glob('*.json')}
+                    test.staged={int(p.stem):json.loads(p.read_text()) for p in (cwd/'public').glob('*.json') if p.stem.isdecimal()}
+                    test.staged_index=json.loads((cwd/'public/index.json').read_text())
                     return 'https://staged-test.vercel.app'
                 if args[0]=='curl':
+                    if args[1]=='/index.json':
+                        if test.concurrent_index: test.site.index['description']='concurrent-update'
+                        index=copy.deepcopy(test.staged_index)
+                        if test.tamper_index: index['sources'].pop(str(ID-1))
+                        return canonical(index)
                     value=copy.deepcopy(test.staged[ID])
                     if test.tamper:value['payload']+=' '
                     if test.concurrent:
                         r=profile();r['revision']=3;test.site.public[ID]=sign(r,test.pem,test.public)
                     return canonical(value)
                 if args[0]=='promote':
-                    test.promotes+=1;test.site.public.update(test.staged);return ''
+                    test.promotes+=1;test.site.public.update(test.staged)
+                    test.site.index=copy.deepcopy(test.staged_index)
+                    return ''
                 raise AssertionError('Unexpected command')
         import tempfile
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        (Path(self.tmp.name)/'index.json').write_text(canonical(self.site.index))
         self.publisher=Publisher(self.public,self.pem,self.feed,{},Path(self.tmp.name),allowed_ids={ID,ID-1},http_factory=lambda:Transport(self.site,1))
     def test_cli_token_is_environment_only(self):
         from automation.publisher import VercelPublisher
@@ -278,6 +294,42 @@ class PublicationGateTest(unittest.TestCase):
         self.concurrent=True;candidate=profile();candidate['revision']=2
         with self.assertRaises(Unsafe):self.publisher(candidate)
         self.assertEqual(self.promotes,0);self.assertEqual(verify(self.site.public[ID],self.public,ID)['revision'],3)
+    def test_stale_checkout_cannot_remove_public_source(self):
+        self.site.index['sources']['6058166507489091982']={
+            'name':'Manga Starz','state':'BUILT_IN',
+            'manifest':'6058166507489091982.json','publishedRevision':None}
+        before=copy.deepcopy(self.site.index)
+        candidate=profile();candidate['revision']=2
+        with self.assertRaisesRegex(Unsafe,'PUBLIC_SOURCE_MISSING_FROM_CHECKOUT'):
+            self.publisher(candidate)
+        self.assertEqual(self.site.index,before)
+        self.assertEqual(self.promotes,0);self.assertIsNone(self.staged)
+    def test_public_source_name_cannot_change(self):
+        self.site.index['sources'][str(ID-1)]['name']='Unexpected-rename'
+        candidate=profile();candidate['revision']=2
+        with self.assertRaisesRegex(Unsafe,'PUBLIC_SOURCE_IDENTITY_CHANGED'):
+            self.publisher(candidate)
+        self.assertEqual(self.promotes,0);self.assertIsNone(self.staged)
+    def test_remote_repair_index_metadata_is_preserved(self):
+        self.site.index['sources'][str(ID-1)].update(
+            state='SIGNED_REPAIR_AVAILABLE',publishedRevision=1)
+        candidate=profile();candidate['revision']=2
+        self.publisher(candidate)
+        self.assertEqual(self.promotes,1)
+        self.assertEqual(self.site.index['sources'][str(ID-1)]['publishedRevision'],1)
+        self.assertEqual(self.site.index['sources'][str(ID-1)]['state'],'SIGNED_REPAIR_AVAILABLE')
+    def test_staged_index_tampering_cannot_promote(self):
+        self.tamper_index=True
+        candidate=profile();candidate['revision']=2
+        with self.assertRaisesRegex(Unsafe,'STAGED_SOURCE_INDEX_MISMATCH'):
+            self.publisher(candidate)
+        self.assertEqual(self.promotes,0)
+    def test_concurrent_index_update_cannot_be_overwritten(self):
+        self.concurrent_index=True
+        candidate=profile();candidate['revision']=2
+        with self.assertRaisesRegex(Unsafe,'CONCURRENT_SOURCE_INDEX_UPDATE'):
+            self.publisher(candidate)
+        self.assertEqual(self.promotes,0)
     def test_bad_candidate_leaves_previous_public_rule(self):
         old=copy.deepcopy(self.site.public);candidate=profile();candidate['revision']=2
         candidate['operations']['pages']['rows']='missing'

@@ -30,11 +30,41 @@ class VercelPublisher:
         except ValueError: raise Unsafe('PUBLIC_FEED_INVALID_JSON') from None
         verify(envelope,self.public,sid)
         return envelope
+    def fetch_index(self):
+        response=self.http_factory().get(self.feed+'/index.json')
+        if response.status!=200: raise Unsafe('PUBLIC_SOURCE_INDEX_UNAVAILABLE')
+        try: index=json.loads(response.body)
+        except (ValueError,TypeError): raise Unsafe('PUBLIC_SOURCE_INDEX_INVALID') from None
+        if not isinstance(index,dict) or index.get('schema')!=1 or not isinstance(index.get('sources'),dict):
+            raise Unsafe('PUBLIC_SOURCE_INDEX_INVALID')
+        return index
     def __call__(self,candidate,previous=None):
         sid=candidate['sourceId']
         if sid not in self.allowed: raise Unsafe('UNREGISTERED_PUBLICATION_TARGET')
         validate(candidate,self.http_factory(),previous) # Final independent pre-sign gate.
         signed=sign(candidate,self.key,self.public)
+        live_index=self.fetch_index()
+        local_index_path=self.directory/'index.json'
+        if not local_index_path.is_file(): raise Unsafe('LOCAL_SOURCE_INDEX_MISSING')
+        try: local_index=json.loads(local_index_path.read_text())
+        except (ValueError,TypeError): raise Unsafe('LOCAL_SOURCE_INDEX_INVALID') from None
+        if not isinstance(local_index,dict) or local_index.get('schema')!=1 or not isinstance(local_index.get('sources'),dict):
+            raise Unsafe('LOCAL_SOURCE_INDEX_INVALID')
+        local_sources=local_index['sources']
+        for existing_id,old_record in live_index['sources'].items():
+            new_record=local_sources.get(existing_id)
+            if new_record is None: raise Unsafe('PUBLIC_SOURCE_MISSING_FROM_CHECKOUT')
+            if not isinstance(old_record,dict) or not isinstance(new_record,dict) or any(
+                new_record.get(field)!=old_record.get(field) for field in ('name','manifest')
+            ): raise Unsafe('PUBLIC_SOURCE_IDENTITY_CHANGED')
+        # The current public index is authoritative for all existing entries.
+        # Add only new registered sources from this checkout; keep live repair metadata.
+        proposed_index=copy.deepcopy(live_index)
+        for new_id,new_record in local_sources.items():
+            if new_id not in proposed_index['sources']:
+                proposed_index['sources'][new_id]=copy.deepcopy(new_record)
+        if str(candidate['sourceId']) not in proposed_index['sources']:
+            raise Unsafe('PUBLICATION_TARGET_MISSING_FROM_INDEX')
         old={i:self.fetch(i) for i in self.allowed}
         existing=old[sid]
         if existing and candidate['revision']<=verify(existing,self.public,sid)['revision']: raise Unsafe('REVISION_DOWNGRADE_OR_REUSE')
@@ -48,10 +78,8 @@ class VercelPublisher:
                 else: p.unlink(missing_ok=True)
             (root/'public'/f'{sid}.json').write_text(canonical(signed))
             index=root/'public/index.json'
-            if index.exists():
-                data=json.loads(index.read_text())
-                if str(sid) in data.get('sources',{}): data['sources'][str(sid)].update(state='SIGNED_REPAIR_AVAILABLE',publishedRevision=candidate['revision'])
-                index.write_text(canonical(data))
+            proposed_index['sources'][str(sid)].update(state='SIGNED_REPAIR_AVAILABLE',publishedRevision=candidate['revision'])
+            index.write_text(canonical(proposed_index))
             (root/'.vercel').mkdir(); (root/'.vercel/project.json').write_text(canonical(self.hosting))
             (root/'vercel.json').write_text(canonical({'framework':None,'buildCommand':'','outputDirectory':'public','headers':[{'source':'/(.*)','headers':[{'key':'Cache-Control','value':'public, max-age=0, must-revalidate'},{'key':'X-Content-Type-Options','value':'nosniff'}]}]}))
             # No signing bytes/environment files in this directory. Directory contains public data only.
@@ -66,7 +94,12 @@ class VercelPublisher:
             except ValueError: raise Unsafe('STAGED_FEED_FETCH_FAILED') from None
             verify(staged,self.public,sid)
             if staged['payload']!=signed['payload']: raise Unsafe('STAGED_PAYLOAD_MISMATCH')
+            staged_index_raw=self.command(['curl','/index.json','--deployment',deployment,'--','--silent','--fail'],root)
+            try: staged_index=json.loads(staged_index_raw)
+            except (ValueError,TypeError): raise Unsafe('STAGED_SOURCE_INDEX_INVALID') from None
+            if canonical(staged_index)!=canonical(proposed_index): raise Unsafe('STAGED_SOURCE_INDEX_MISMATCH')
             # A concurrent manual publisher must not be overwritten with a stale multi-source snapshot.
+            if canonical(self.fetch_index())!=canonical(live_index): raise Unsafe('CONCURRENT_SOURCE_INDEX_UPDATE')
             for source_id,envelope in old.items():
                 current=self.fetch(source_id)
                 if canonical(current)!=canonical(envelope): raise Unsafe('CONCURRENT_FEED_UPDATE')
@@ -75,7 +108,8 @@ class VercelPublisher:
                 public=self.fetch(sid)
                 if public and public['payload']==signed['payload']:
                     result=verify(public,self.public,sid)
-                    if result['revision']==candidate['revision']: return signed
+                    if result['revision']==candidate['revision']:
+                        if canonical(self.fetch_index())==canonical(proposed_index): return signed
                 import time
                 time.sleep(2)
             raise Unsafe('POST_PROMOTION_PUBLIC_VERIFICATION_FAILED')

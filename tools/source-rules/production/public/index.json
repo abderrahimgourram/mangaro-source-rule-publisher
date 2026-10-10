@@ -43,6 +43,12 @@
       "state": "BUILT_IN",
       "manifest": "7657007209499352344.json",
       "publishedRevision": null
+    },
+    "6058166507489091982": {
+      "name": "Manga Starz",
+      "state": "BUILT_IN",
+      "manifest": "6058166507489091982.json",
+      "publishedRevision": null
     }
   }
 }

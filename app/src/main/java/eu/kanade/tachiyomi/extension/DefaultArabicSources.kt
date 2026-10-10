@@ -39,6 +39,11 @@ object DefaultArabicSources {
             name = "مانجا ليك",
             englishName = "MangaLek",
         ),
+        RecommendedSource(
+            pkgName = "eu.kanade.tachiyomi.extension.ar.mangastarz",
+            name = "Manga Starz",
+            englishName = "Manga Starz",
+        ),
     )
 
     val PACKAGE_NAMES = SOURCES.map { it.pkgName }.toSet()
