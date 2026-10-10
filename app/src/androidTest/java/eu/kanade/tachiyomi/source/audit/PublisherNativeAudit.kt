@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.source.internal.mangadar.MangaDar
 import eu.kanade.tachiyomi.source.internal.mangalek.MangaLek
 import eu.kanade.tachiyomi.source.internal.mangatime.MangaTime
 import eu.kanade.tachiyomi.source.internal.mangaswat.MangaSwat
+import eu.kanade.tachiyomi.source.internal.mangastarz.MangaStarz
 import eu.kanade.tachiyomi.source.internal.teamx.TeamX
 import eu.kanade.tachiyomi.source.model.*
 import eu.kanade.tachiyomi.source.online.HttpSource
@@ -34,6 +35,7 @@ object PublisherNativeAudit {
         val factories: List<Pair<String, (OkHttpClient) -> HttpSource>> = listOf(
             "TeamX" to { TeamX(it) }, "MangaTime" to { MangaTime(it) }, "MangaLek" to { MangaLek(it) },
             "Azora" to { Azora(it) }, "Hijala" to { Hijala(it) }, "MangaDar" to { MangaDar(it) }, "MangaSwat" to { MangaSwat(it) },
+            "Manga Starz" to { MangaStarz(it) },
         )
         for ((name, factory) in factories.filter { selected == null || it.first == selected }) {
             val requests = AtomicInteger()
