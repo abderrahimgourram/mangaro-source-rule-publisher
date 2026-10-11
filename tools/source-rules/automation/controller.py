@@ -77,7 +77,6 @@ class Controller:
                     return new,report|{'health':'DEGRADED','result':'BUILT_IN_UNOBSERVED_TRANSPORT'}
                 return new,report|{'health':'DEGRADED' if unverified else 'HEALTHY','result':'BUILT_IN_CHAPTERS_UNVERIFIED' if unverified else 'BUILT_IN_HEALTHY'}
             if transient:
-                new['failures']=0
                 return new,report|{'result':'TRANSIENT_NO_REPAIR'}
             new['failures']=new.get('failures',0)+1
             if new['failures']<THRESHOLD: return new,report|{'result':'FAILURE_PENDING','failureCount':new['failures']}
@@ -92,7 +91,6 @@ class Controller:
             new['baseline']=rules; new['witness']=verified; new['evidence']=capture(rules,self.http_factory()); new['failures']=0
             return new,report|{'health':'HEALTHY','result':'ACTIVE_HEALTHY' if remote else 'BUILT_IN_HEALTHY'}
         except Transient as e:
-            new['failures']=0
             return new,report|{'result':'TRANSIENT_NO_REPAIR','reason':str(e)}
         except Unsafe as e: report['failure']=str(e)
         new['failures']=new.get('failures',0)+1
@@ -102,6 +100,10 @@ class Controller:
         try:
             changes=changed_observations(rules,new,self.http_factory())
             candidate=generator.generate(rules,changes)
+            if candidate['baseUrl'] != rules['baseUrl']:
+                raise Unsafe('DOMAIN_CHANGE_REQUIRES_REVIEW')
+            if candidate.get('headers',{}) != rules.get('headers',{}):
+                raise Unsafe('HEADER_CHANGE_REQUIRES_REVIEW')
             candidate['sourceId']=sid
             candidate['revision']=max(rules['revision'],new.get('revisionFloor',0))+1
             hash_=profile_hash(candidate)
@@ -113,6 +115,7 @@ class Controller:
             # A hash includes exact mappings, and repeated passes include all chapter identities.
             # Current snapshot is captured only after both passes; publication revalidates again.
             evidence=capture(candidate,self.http_factory())
+            new['candidate']={'hash':hash_, 'status':'STAGING_REQUIRED', 'checkedAt':now}
             new['revisionFloor']=candidate['revision'] # Reserve before publication; never reuse failed revisions.
             self.publisher(candidate,new.get('witness'))
             new.update(baseline=candidate,witness=second,evidence=evidence,publishedAt=now,failures=0)

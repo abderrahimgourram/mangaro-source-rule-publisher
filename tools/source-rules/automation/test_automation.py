@@ -142,7 +142,7 @@ class AutomationTest(unittest.TestCase):
         site,state,reports=self.repair({'endpoint'});self.assertEqual(reports[-1]['result'],'REPAIRED',reports)
         self.assertEqual(state['baseline']['operations']['search']['parameters']['s'],'{query}')
     def test_domain(self):
-        site,state,reports=self.repair({'domain'});self.assertEqual(reports[-1]['result'],'REPAIRED',reports);self.assertIn('publisher-new',state['baseline']['baseUrl'])
+        site,state,reports=self.repair({'domain'});self.assertEqual(reports[-1]['reason'],'DOMAIN_CHANGE_REQUIRES_REVIEW',reports);self.assertEqual(site.publications,0);self.assertEqual(state['baseline']['baseUrl'],BASE)
     def test_pagination_parameter(self):
         site,state,reports=self.repair({'pagination'});self.assertEqual(reports[-1]['result'],'REPAIRED',reports)
         self.assertEqual(state['baseline']['operations']['popular']['pagination']['pageParameter'],'p')
@@ -170,9 +170,9 @@ class AutomationTest(unittest.TestCase):
         r=profile();r['code']='Kotlin';
         with self.assertRaises(Unsafe):schema(r)
     def test_single_timeout_cannot_publish(self):
-        site=Site();state=self.baseline(site);c=Controller(site.http,site.publish,clock=lambda:1000000)
+        site=Site();state=self.baseline(site);state['failures']=2;c=Controller(site.http,site.publish,clock=lambda:1000000)
         with patch('automation.controller.validate',side_effect=Transient('NETWORK_TIMEOUT')):state,report=c.run({'sourceId':ID,'name':'diagnostic'},state)
-        self.assertEqual(state['failures'],0);self.assertEqual(site.publications,0)
+        self.assertEqual(state['failures'],2);self.assertEqual(site.publications,0)
     def test_one_broken_source_leaves_other_healthy(self):
         good=Site();state=self.baseline(good);bad=self.repair({'unsupported'})
         c=Controller(good.http,good.publish,clock=lambda:1000000);_,r=c.run({'sourceId':ID,'name':'independent'},state)

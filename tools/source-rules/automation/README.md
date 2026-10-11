@@ -1,27 +1,15 @@
 # Automatic signed-rule publisher
 
 The private Actions repository is `abderrahimgourram/mangaro-source-rule-publisher`.
-It includes a committed Android snapshot so probes run the actual seven native source
+It includes a committed Android snapshot so probes run the registered native source
 implementations through NetworkHelper on emulator-5554. No Android production code changes.
 
 ## Operation
 
-The default-branch workflow runs every six hours at 00:23, 06:23, 12:23 and 18:23 UTC.
-Manual dispatch supports `audit`, `staging`, and `production`. Production publication is
-additionally gated by the repository variable `MANGARO_AUTOPUBLISH_ENABLED=true`.
-Staging must pass before enabling that variable.
-
-```sh
-gh workflow run source-rule-publisher.yml --repo abderrahimgourram/mangaro-source-rule-publisher -f mode=audit
-gh workflow run source-rule-publisher.yml --repo abderrahimgourram/mangaro-source-rule-publisher -f mode=staging
-```
-
-Normal supported repair publication requires no manual JSON edit/sign/deploy. After a
-compiled source update, synchronize its committed native parser expectations with:
-
-```sh
-python3 tools/source-rules/automation/sync-repository.py
-```
+See [RELIABILITY.md](RELIABILITY.md) for schedules, coverage, persistent monitoring history,
+verification tiers and local checks. Six-hour monitoring does not build Android or use
+production credentials. Production publication is disabled in the workflow and CLI,
+even if the old repository variable is enabled. Manual staging remains isolated.
 
 ## Trust and hosting
 
@@ -44,15 +32,15 @@ are capped at 48 per source and a 150-second source deadline. Publisher HTTP cli
 have bounded requests, body limits, timeouts, pacing, public HTTPS-only destinations,
 and redirect limits. Transient errors never cause publication.
 
-A repair requires three consecutive semantic failures, a previously verified mapping,
+A repair candidate requires three consecutive semantic failures, a previously verified mapping,
 unique stable-identity evidence for each changed extraction, schema-1 compatibility,
-two identical full validation passes, and a final pre-signing validation. Validation
+two identical full validation passes, staging acceptance, and explicit authorization before production publication. Validation
 checks differing catalogue pages, search identity, details identity, several works,
 all bounded chapter pages, unique chapter identities, exact totals where declared,
 retention of known chapter IDs and Reader page counts, and a real image signature. Partial native chapter
 results cannot become a COMPLETE generic baseline. Azora NOVEL exclusion is mandatory.
 
-JSON paths/selectors/endpoints/domain/query mappings are inferred only from prior known
+JSON paths/selectors/endpoints/query mappings are inferred only from prior known
 values and current response relationships. Ambiguity, inaccessible challenge pages,
 unsupported executable transformations, incomplete chapters, or unstable representations
 produce no publication and `REQUIRES_COMPILED_UPDATE` after the threshold.
