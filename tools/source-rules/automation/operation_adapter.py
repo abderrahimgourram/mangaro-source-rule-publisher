@@ -89,7 +89,17 @@ def readiness():
             row=state.get('sources',{}).get(source,{})
             require(row.get('approved') is True,'SOURCE_PUBLICATION_GATE_CLOSED')
             require(row.get('lastKnownGood') and row.get('witness'),'AUTHENTICATED_LAST_KNOWN_GOOD_REQUIRED')
-            auth(row['lastKnownGood'])
+            previous=auth(row['lastKnownGood'])
+            require(previous['revision']<current['revision'],'AUTHENTICATED_PRIOR_REVISION_REQUIRED')
+            if row.get('pending'):
+                pending=row['pending']
+                require(pending.get('kind') in {'repair','rollback'},'INVALID_PENDING_OPERATION')
+                require(fingerprint(pending.get('beforeEnvelope'))==pending.get('beforeHash'),'INVALID_PENDING_PARENT')
+                auth(pending['beforeEnvelope'])
+                require(fingerprint(live)==pending['beforeHash'] or fingerprint(current)==pending.get('candidateHash'),'PENDING_REVISION_CANNOT_BE_SAFELY_RECONCILED')
+                eligible.append(source);reason='AUTHENTICATED_PENDING_RECONCILIATION_REQUIRED'
+                rows.append({'source':item['name'],'id':source,'gate':reason})
+                continue
             require(row.get('publishedHash')==fingerprint(live),'PUBLISHED_REVISION_CHANGED')
             require(row['witness'].get('complete') is True,'COMPLETENESS_UNPROVEN')
             if observations is None:
@@ -181,7 +191,8 @@ def execute():
         require(proof is not None,'REAL_SOURCE_STAGING_ACCEPTANCE_UNAVAILABLE')
         receipt=unseal(proof)
         require(receipt.get('purpose')=='SOURCE_STAGING_ACCEPTANCE_V1' and receipt.get('repository')==REPOSITORY,'STAGING_PROVENANCE_MISMATCH')
-        require(time.time()-receipt.get('verifiedAt',0)<=3600,'STAGING_ACCEPTANCE_EXPIRED')
+        stamp=receipt.get('verifiedAt')
+        require(type(stamp) is int and 0<=time.time()-stamp<=3600,'STAGING_ACCEPTANCE_EXPIRED')
         require(receipt.get('independentRun') and receipt.get('producerRun')!=receipt.get('independentRun'),'INDEPENDENT_STAGING_REQUIRED')
         return receipt
     coordinator=Coordinator(store,auth,independent,stage,publish,fetch)

@@ -106,11 +106,25 @@ class OperationsTest(unittest.TestCase):
         with self.assertRaisesRegex(OperationBlocked,'SAFELY_RECONCILED'):self.coordinator.reconcile('42')
         self.assertIn('pending',self.store.state['sources']['42']);self.assertFalse(self.published)
     def test_crash_reconciliation_retains_authenticated_last_good(self):
-        row=self.store.state['sources']['42'];row['pending']={'candidateHash':fingerprint(rule(2)),'beforeHash':fingerprint(rule()),'beforeEnvelope':rule(),'beforeWitness':row['witness']}
+        row=self.store.state['sources']['42'];row['pending']={'kind':'repair','candidateHash':fingerprint(rule(2)),'beforeHash':fingerprint(rule()),'beforeEnvelope':rule(),'beforeWitness':row['witness']}
         self.live=rule(2)
         result=self.coordinator.reconcile('42')
         self.assertEqual(result['action'],'PUBLISHED_OPERATION_RECONCILED_VERIFICATION_REQUIRED')
         self.assertEqual(self.store.state['sources']['42']['lastKnownGood'],rule())
+        self.assertFalse(self.published)
+    def test_interrupted_rollback_keeps_original_good_revision(self):
+        row=self.store.state['sources']['42']
+        row['pending']={'kind':'rollback','candidateHash':fingerprint(rule(3)),'beforeHash':fingerprint(rule(2)),'beforeEnvelope':rule(2),'beforeWitness':row['witness']}
+        self.live=rule(3)
+        self.coordinator.reconcile('42')
+        self.assertEqual(self.store.state['sources']['42']['lastKnownGood'],rule())
+        self.assertNotIn('pending',self.store.state['sources']['42'])
+    def test_interrupted_publication_cannot_clear_pending_without_live_acceptance(self):
+        row=self.store.state['sources']['42']
+        row['pending']={'kind':'repair','candidateHash':fingerprint(rule(2)),'beforeHash':fingerprint(rule()),'beforeEnvelope':rule(),'beforeWitness':row['witness']}
+        self.live=rule(2);self.coordinator.independent=lambda *args:{'complete':False}
+        with self.assertRaisesRegex(OperationBlocked,'INCOMPLETE'):self.coordinator.reconcile('42')
+        self.assertIn('pending',self.store.state['sources']['42'])
         self.assertFalse(self.published)
     def test_disabled_operation_never_acquires_credentials_or_fetches(self):
         import operation_adapter,os
@@ -146,7 +160,8 @@ class OperationsTest(unittest.TestCase):
         from unittest.mock import patch
         inventory={'42':{'name':'deterministic fixture'}}
         journal=self.store.read();journal['sources']['42']['witness']['complete']=True
-        def configuration():return inventory,lambda x:x,lambda source:rule(),lambda x:x,None
+        journal['sources']['42']['publishedHash']=fingerprint(rule(2))
+        def configuration():return inventory,lambda x:x,lambda source:rule(2),lambda x:x,None
         for failures,classification,expected in [(0,'HEALTHY',[]),(3,'BLOCKED_BY_CHALLENGE',[]),(3,'DEGRADED',['42'])]:
             def restore(path,*args):
                 value=reliability.new_state();value['sources']['42']={'classification':classification,'consecutiveFailures':failures};reliability.save(path,value)
