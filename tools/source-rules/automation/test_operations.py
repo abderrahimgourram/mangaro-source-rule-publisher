@@ -133,4 +133,26 @@ class OperationsTest(unittest.TestCase):
         preflight=workflow.split('  gates:',1)[1].split('  signing-contract:',1)[0]
         self.assertNotIn('secrets.',preflight)
 
+    def test_monitoring_and_disabled_operation_runs_cannot_replace_production_queue(self):
+        root=HERE.parents[2] if (HERE/'operations.py').exists() else HERE.parent
+        manga=(HERE/'operations.py').exists()
+        health=(root/'.github/workflows'/('source-rule-publisher.yml' if manga else 'health.yml')).read_text()
+        operations=(root/'.github/workflows/source-operations.yml').read_text()
+        self.assertIn("|| 'mangaro-source-monitoring'" if manga else "|| 'novel-source-monitoring'",health)
+        self.assertIn("format('source-operations-disabled-{0}', github.run_id)",operations)
+        self.assertIn("format('source-signing-check-{0}', github.run_id)",operations)
+    def test_only_affected_sources_are_eligible_for_signed_operations(self):
+        import operation_adapter,reliability
+        from unittest.mock import patch
+        inventory={'42':{'name':'deterministic fixture'}}
+        journal=self.store.read();journal['sources']['42']['witness']['complete']=True
+        def configuration():return inventory,lambda x:x,lambda source:rule(),lambda x:x,None
+        for failures,classification,expected in [(0,'HEALTHY',[]),(3,'BLOCKED_BY_CHALLENGE',[]),(3,'DEGRADED',['42'])]:
+            def restore(path,*args):
+                value=reliability.new_state();value['sources']['42']={'classification':classification,'consecutiveFailures':failures};reliability.save(path,value)
+            with patch.object(operation_adapter,'configuration',side_effect=configuration),patch.object(operation_adapter,'GitJournal') as store,patch('reliability.restore_history',side_effect=restore):
+                store.return_value.read.return_value=journal
+                result=operation_adapter.readiness()
+            self.assertEqual(result['eligible'],expected)
+
 if __name__=='__main__':unittest.main()

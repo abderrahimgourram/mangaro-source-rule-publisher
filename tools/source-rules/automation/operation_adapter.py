@@ -74,7 +74,7 @@ def signing_contract():
 
 def readiness():
     inventory,auth,fetch,unseal,publisher=configuration()
-    rows=[];eligible=[]
+    rows=[];eligible=[];observations=None
     try:
         journal=GitJournal(api,REPOSITORY,lambda value: (_ for _ in ()).throw(OperationBlocked('READ_ONLY_PREFLIGHT')),unseal)
         state=journal.read()
@@ -92,7 +92,17 @@ def readiness():
             auth(row['lastKnownGood'])
             require(row.get('publishedHash')==fingerprint(live),'PUBLISHED_REVISION_CHANGED')
             require(row['witness'].get('complete') is True,'COMPLETENESS_UNPROVEN')
-            eligible.append(source);reason='VERIFIED_JOURNAL_AVAILABLE'
+            if observations is None:
+                import tempfile
+                from reliability import restore_history,load
+                with tempfile.TemporaryDirectory() as directory:
+                    path=Path(directory)/'state.json'
+                    restore_history(path,REPOSITORY,'source-rule-publisher.yml' if MANGA else 'health.yml','main')
+                    observations=load(path)['sources']
+            observed=observations.get(source,{})
+            require(observed.get('classification') not in {'TRANSIENT_NETWORK_ERROR','BLOCKED_BY_CHALLENGE','UNVERIFIED_TRANSPORT','INSUFFICIENT_EVIDENCE'},'OBSERVATION_NOT_REPAIR_EVIDENCE')
+            require(observed.get('consecutiveFailures',0)>=3 or row.get('publishedFailures') or row.get('pending'),'NO_SOURCE_OPERATION_DUE')
+            eligible.append(source);reason='VERIFIED_JOURNAL_ACTION_DUE'
         except Exception as error:
             reason=str(error) if isinstance(error,OperationBlocked) else 'SIGNED_REVISION_VERIFICATION_FAILED'
         rows.append({'source':item['name'],'id':source,'gate':reason})

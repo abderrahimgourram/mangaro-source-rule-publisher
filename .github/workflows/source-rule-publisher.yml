@@ -23,7 +23,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && format('mangaro-source-rule-publisher-{0}', github.ref) || 'mangaro-source-rule-publisher' }}
+  group: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && format('mangaro-source-rule-publisher-{0}', github.ref) || 'mangaro-source-monitoring' }}
   cancel-in-progress: false
 env:
   MANGARO_AUTOPUBLISH_ENABLED: 'false'

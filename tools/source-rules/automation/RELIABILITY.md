@@ -97,3 +97,11 @@ Activation blockers currently include absent authenticated published last-good r
 absent real-source candidate staging receipts. Diagnostic staging fixtures do not satisfy
 real-source acceptance. Novel sample attestation/unknown index totals remain insufficient.
 Do not enable the production variable merely because signing or monitoring CI succeeds.
+
+Monitoring uses its own history-write concurrency group. Publication and rollback share
+a separate publication group; manual signing checks and disabled operation runs have
+unique groups, so GitHub's one-pending-run replacement cannot cancel monitoring or
+protected publication accidentally. Repair execution reads authenticated observational
+history for *eligibility only*: three semantic failures or a pending confirmed regression.
+Healthy/unaffected sources do not trigger deep/signing jobs. Observation history never
+satisfies the independent production acceptance gates.

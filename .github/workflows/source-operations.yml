@@ -13,13 +13,16 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: mangaro-source-rule-publisher
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_signing && format('source-signing-check-{0}', github.run_id) || vars.MANGARO_AUTOPUBLISH_ENABLED != 'true' && format('source-operations-disabled-{0}', github.run_id) || 'mangaro-source-rule-publisher' }}
   cancel-in-progress: false
 jobs:
   gates:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && vars.MANGARO_AUTOPUBLISH_ENABLED == 'true'))
     runs-on: ubuntu-24.04
     timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
     outputs:
       eligible: ${{ steps.gates.outputs.eligible }}
     steps:
@@ -67,6 +70,7 @@ jobs:
     if: needs.gates.outputs.eligible == 'true' && vars.MANGARO_AUTOPUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
+      actions: read
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
