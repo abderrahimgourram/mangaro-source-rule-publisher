@@ -33,7 +33,9 @@ def main():
     props,sources=configuration(); feed=props['sourceRulesUrl']; public=props['sourceRulesPublicKey']
     args.state.mkdir(parents=True,exist_ok=True); args.state.chmod(0o700)
     lock=(args.state/'run.lock').open('a'); fcntl.flock(lock,fcntl.LOCK_EX)
-    natives={x['sourceId']:x for x in json.loads(args.native_evidence.read_text())['sources']}
+    evidence_json = json.loads(args.native_evidence.read_text())
+    natives={x['sourceId']:x for x in evidence_json['sources']}
+    cross_source_evidence=evidence_json.get('crossSourceEvidence')
     # The bundle is consumed in memory and removed from subprocess environment. Signing never
     # creates a PEM file/artifact and verifies the APK's existing public trust anchor.
     secret=os.environ.pop('MANGARO_AUTOMATION_SECRET',None)
@@ -79,7 +81,9 @@ def main():
     with ThreadPoolExecutor(max_workers=2) as pool:
         reports=list(pool.map(operation,sources))
     args.report.parent.mkdir(parents=True,exist_ok=True)
-    args.report.write_text(json.dumps({'schema':1,'checkedAt':int(time.time()),'mode':'publish' if args.publish else 'audit','sources':reports},indent=2)+'\n')
+    report_out = {'schema':1,'checkedAt':int(time.time()),'mode':'publish' if args.publish else 'audit','sources':reports}
+    if cross_source_evidence: report_out['crossSourceEvidence'] = cross_source_evidence
+    args.report.write_text(json.dumps(report_out,indent=2)+'\n')
     print(json.dumps({'sources':[{k:v for k,v in r.items() if k in {'source','health','result','revision','reason','failure','failureCount'}} for r in reports]},indent=2))
 
 def atomic(path,value):

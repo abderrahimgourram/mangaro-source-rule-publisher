@@ -183,8 +183,78 @@ object PublisherNativeAudit {
             }
             record("Publisher native $name: ${steps.entries.joinToString { "${it.key}=${it.value}" }} requests=${requests.get()}")
         }
+        var crossSourceDiagnostic: JsonObject? = null
+        val starzResult = results.find { it["name"]?.jsonPrimitive?.content == "Manga Starz" }
+        val lekResult = results.find { it["name"]?.jsonPrimitive?.content == "MangaLek" }
+        if (starzResult != null && lekResult != null) {
+            fun extractSlugs(urls: List<String?>?): List<String>? {
+                if (urls.isNullOrEmpty()) return null
+                return urls.mapNotNull { url ->
+                    url?.removeSuffix("/")?.substringAfterLast("/")?.takeIf { it.isNotBlank() }
+                }
+            }
+
+            val starzPopUrls = starzResult["observations"]?.jsonArray?.find { it.jsonObject["operation"]?.jsonPrimitive?.content == "popular" }?.jsonObject?.get("mangas")?.jsonArray?.map { it.jsonObject["url"]?.jsonPrimitive?.content }
+            val lekPopUrls = lekResult["observations"]?.jsonArray?.find { it.jsonObject["operation"]?.jsonPrimitive?.content == "popular" }?.jsonObject?.get("mangas")?.jsonArray?.map { it.jsonObject["url"]?.jsonPrimitive?.content }
+
+            val starzPopSlugs = extractSlugs(starzPopUrls)
+            val lekPopSlugs = extractSlugs(lekPopUrls)
+
+            val identicalPopularSlugs = if (starzPopSlugs.isNullOrEmpty() || lekPopSlugs.isNullOrEmpty()) "INSUFFICIENT_EVIDENCE" else (starzPopSlugs == lekPopSlugs).toString()
+
+            val starzPopTitles = starzResult["observations"]?.jsonArray?.find { it.jsonObject["operation"]?.jsonPrimitive?.content == "popular" }?.jsonObject?.get("mangas")?.jsonArray?.map { it.jsonObject["title"]?.jsonPrimitive?.content }
+            val lekPopTitles = lekResult["observations"]?.jsonArray?.find { it.jsonObject["operation"]?.jsonPrimitive?.content == "popular" }?.jsonObject?.get("mangas")?.jsonArray?.map { it.jsonObject["title"]?.jsonPrimitive?.content }
+
+            val identicalTitles = if (starzPopTitles.isNullOrEmpty() || lekPopTitles.isNullOrEmpty()) "INSUFFICIENT_EVIDENCE" else (starzPopTitles == lekPopTitles).toString()
+
+            val starzChapters = starzResult["observations"]?.jsonArray?.filter { it.jsonObject["operation"]?.jsonPrimitive?.content == "details" }?.flatMap { it.jsonObject["chapters"]?.jsonArray?.map { c -> c.jsonObject["url"]?.jsonPrimitive?.content } ?: emptyList() }
+            val lekChapters = lekResult["observations"]?.jsonArray?.filter { it.jsonObject["operation"]?.jsonPrimitive?.content == "details" }?.flatMap { it.jsonObject["chapters"]?.jsonArray?.map { c -> c.jsonObject["url"]?.jsonPrimitive?.content } ?: emptyList() }
+
+            val starzChapterNames = starzResult["observations"]?.jsonArray?.filter { it.jsonObject["operation"]?.jsonPrimitive?.content == "details" }?.flatMap { it.jsonObject["chapters"]?.jsonArray?.map { c -> c.jsonObject["name"]?.jsonPrimitive?.content } ?: emptyList() }
+            val lekChapterNames = lekResult["observations"]?.jsonArray?.filter { it.jsonObject["operation"]?.jsonPrimitive?.content == "details" }?.flatMap { it.jsonObject["chapters"]?.jsonArray?.map { c -> c.jsonObject["name"]?.jsonPrimitive?.content } ?: emptyList() }
+
+            val starzChapterSteps = starzResult["steps"]?.jsonObject?.filterKeys { it.startsWith("chapters-") }?.values?.map { it.jsonPrimitive.content } ?: emptyList()
+            val lekChapterSteps = lekResult["steps"]?.jsonObject?.filterKeys { it.startsWith("chapters-") }?.values?.map { it.jsonPrimitive.content } ?: emptyList()
+
+            val starzChaptersSuccess = starzChapterSteps.isNotEmpty() && starzChapterSteps.all { it.startsWith("PASS_") }
+            val lekChaptersSuccess = lekChapterSteps.isNotEmpty() && lekChapterSteps.all { it.startsWith("PASS_") }
+
+            val identicalChapterUrls = if (!starzChaptersSuccess || !lekChaptersSuccess || starzChapters.isNullOrEmpty() || lekChapters.isNullOrEmpty()) {
+                "INSUFFICIENT_EVIDENCE"
+            } else {
+                (starzChapters == lekChapters).toString()
+            }
+
+            val identicalChapterNames = if (!starzChaptersSuccess || !lekChaptersSuccess || starzChapterNames.isNullOrEmpty() || lekChapterNames.isNullOrEmpty()) {
+                "INSUFFICIENT_EVIDENCE"
+            } else {
+                (starzChapterNames == lekChapterNames).toString()
+            }
+
+            val starzBase = starzResult["baseUrl"]?.jsonPrimitive?.content
+            val lekBase = lekResult["baseUrl"]?.jsonPrimitive?.content
+            val sameBaseUrl = if (starzBase.isNullOrBlank() || lekBase.isNullOrBlank()) "INSUFFICIENT_EVIDENCE" else (starzBase == lekBase).toString()
+
+            crossSourceDiagnostic = buildJsonObject {
+                put("type", "CROSS_SOURCE_EVIDENCE")
+                put("identicalPopularSlugs", identicalPopularSlugs)
+                put("identicalTitles", identicalTitles)
+                put("identicalChapterUrls", identicalChapterUrls)
+                put("identicalChapterNames", identicalChapterNames)
+                put("sameBaseUrl", sameBaseUrl)
+                put("starzChapterCount", starzChapters?.size ?: 0)
+                put("lekChapterCount", lekChapters?.size ?: 0)
+            }
+            record("Cross-source diagnostic generated: $crossSourceDiagnostic")
+        }
         val target = File(context.filesDir, "publisher-native-evidence.json")
-        target.writeText(buildJsonObject { put("schema", 1); put("sources", JsonArray(results)) }.toString())
+        target.writeText(buildJsonObject {
+            put("schema", 1)
+            put("sources", JsonArray(results))
+            if (crossSourceDiagnostic != null) {
+                put("crossSourceEvidence", crossSourceDiagnostic!!)
+            }
+        }.toString())
         record("Publisher private evidence written; sources=${results.size}")
     }
 }
