@@ -30,6 +30,8 @@ def main():
     parser.add_argument('--publish',action='store_true')
     parser.add_argument('--private-key',type=Path)
     args=parser.parse_args()
+    if args.publish:
+        raise Unsafe('PRODUCTION_PUBLICATION_DISABLED')
     props,sources=configuration(); feed=props['sourceRulesUrl']; public=props['sourceRulesPublicKey']
     args.state.mkdir(parents=True,exist_ok=True); args.state.chmod(0o700)
     lock=(args.state/'run.lock').open('a'); fcntl.flock(lock,fcntl.LOCK_EX)
@@ -57,8 +59,8 @@ def main():
         sid=source['sourceId']; file=args.state/f'{sid}.json'
         try:
             state=open_state(json.loads(file.read_text()),public) if file.exists() else {}
-            if state.get('sourceId') is None: state={} # Safely discard old unscoped publisher counters, never app data.
-            elif state['sourceId']!=sid: raise Unsafe('SIGNED_STATE_SOURCE_MISMATCH')
+            if state and state.get('sourceId') is None: raise Unsafe('UNSCOPED_SIGNED_HISTORY_REQUIRES_MIGRATION')
+            elif state and state['sourceId']!=sid: raise Unsafe('SIGNED_STATE_SOURCE_MISMATCH')
             # Public signed feed is authoritative. A valid 404 is BUILT_IN, not a source outage.
             response=Http(budget=4).get(feed+'/'+str(sid)+'.json')
             if response.status==200:

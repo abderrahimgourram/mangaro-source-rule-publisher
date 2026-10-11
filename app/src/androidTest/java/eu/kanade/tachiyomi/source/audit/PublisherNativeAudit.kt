@@ -51,6 +51,14 @@ object PublisherNativeAudit {
                     synchronized(traces) { traces += buildJsonObject {
                         put("operation", operation); put("url", request.url.toString()); put("finalUrl", response.request.url.toString())
                         put("method", request.method); put("status", response.code); put("contentType", response.header("Content-Type").orEmpty())
+                        put("publicHeaders", buildJsonObject {
+                            for (header in listOf("User-Agent", "Accept", "Accept-Language")) {
+                                request.header(header)?.let { put(header, it) }
+                            }
+                            for (header in listOf("Referer", "Origin")) {
+                                request.header(header)?.takeIf { '?' !in it && '#' !in it }?.let { put(header, it) }
+                            }
+                        })
                         put("body", bytes.toString(Charsets.UTF_8))
                     } }
                 }
@@ -136,11 +144,14 @@ object PublisherNativeAudit {
                             operation = "image"
                             val page = pages.first()
                             if (page.imageUrl.isNullOrBlank()) page.imageUrl = source.getImageUrl(page)
-                            client.newCall(source.repairImageRequest(page).newBuilder().header("Range", "bytes=0-511").build()).awaitSuccess().use { response ->
+                            client.newCall(source.repairImageRequest(page)).awaitSuccess().use { response ->
                                 check(response.header("Content-Type").orEmpty().startsWith("image/"))
-                                val bytes = response.body.source(); bytes.request(16)
-                                val magic = bytes.readByteArray(minOf(16L, bytes.buffer.size)).toString(Charsets.ISO_8859_1)
-                                check(magic.startsWith("\u00ff\u00d8\u00ff") || magic.startsWith("\u0089PNG") || magic.startsWith("GIF8") || magic.startsWith("RIFF") && magic.contains("WEBP") || magic.contains("ftypavif"))
+                                val bytes = response.peekBody(8 * 1024 * 1024L + 1).bytes()
+                                check(bytes.size <= 8 * 1024 * 1024)
+                                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                check(bitmap != null && bitmap.width > 0 && bitmap.height > 0)
+                                bitmap.recycle()
+                                steps["image-decode"] = "PASS"
                             }
                         }
                     }

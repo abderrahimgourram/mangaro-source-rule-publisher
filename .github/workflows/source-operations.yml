@@ -1,0 +1,101 @@
+name: Safe source operations
+on:
+  workflow_run:
+    workflows: [Source rule publisher]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      verify_signing:
+        description: Verify existing pinned signing contract without publication
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_signing && format('source-signing-check-{0}', github.run_id) || vars.MANGARO_AUTOPUBLISH_ENABLED != 'true' && format('source-operations-disabled-{0}', github.run_id) || 'mangaro-source-rule-publisher' }}
+  cancel-in-progress: false
+jobs:
+  gates:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && vars.MANGARO_AUTOPUBLISH_ENABLED == 'true'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      eligible: ${{ steps.gates.outputs.eligible }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/source-rules/automation/requirements.txt
+      - run: python -m pip install -r tools/source-rules/automation/requirements.txt
+      - name: Authenticate source-scoped last-known-good and publication gates
+        id: gates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/source-rules/automation/operation_adapter.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: source-operation-gates-${{ github.run_id }}
+          path: source-operations-report.json
+          retention-days: 7
+  signing-contract:
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_signing && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/source-rules/automation/requirements.txt
+      - run: python -m pip install -r tools/source-rules/automation/requirements.txt
+      - name: Verify key matches existing Android trust anchor; never publish
+        env:
+          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_AUTOMATION_SECRET }}
+          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
+        run: python tools/source-rules/automation/operation_adapter.py --verify-signing
+  apply:
+    needs: gates
+    if: needs.gates.outputs.eligible == 'true' && vars.MANGARO_AUTOPUBLISH_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      actions: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/source-rules/automation/requirements.txt
+      - run: python -m pip install -r tools/source-rules/automation/requirements.txt
+      - name: Regression tests before acquiring signing credentials
+        run: python -m unittest discover -s tools/source-rules/automation -p 'test_*.py' -v
+      - name: Independently verify, stage, sign, publish and verify source-scoped operation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANGARO_AUTOPUBLISH_ENABLED: ${{ vars.MANGARO_AUTOPUBLISH_ENABLED }}
+          MANGARO_AUTOMATION_SECRET: ${{ secrets.MANGARO_AUTOMATION_SECRET }}
+          MANGARO_VERCEL_TOKEN: ${{ secrets.MANGARO_VERCEL_TOKEN }}
+        run: python tools/source-rules/automation/operation_adapter.py --execute
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: source-operation-result-${{ github.run_id }}
+          path: source-operations-report.json
+          if-no-files-found: warn
+          retention-days: 7
