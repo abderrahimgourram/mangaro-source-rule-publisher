@@ -108,7 +108,7 @@ class Coordinator:
                 'INDEPENDENT_STAGING_ACCEPTANCE_REQUIRED')
         require(fingerprint(self.fetch(source)) == fingerprint(live), 'CONCURRENT_PUBLICATION')
         row['revisionFloor'] = max(row.get('revisionFloor', 0), candidate['revision'])
-        row['pending'] = {'kind': kind, 'candidateHash': fingerprint(candidate), 'beforeHash': fingerprint(live), 'beforeEnvelope': live, 'beforeWitness': copy.deepcopy(row['witness']), 'at': int(self.clock())}
+        row['pending'] = {'kind': kind, 'candidateHash': fingerprint(candidate), 'candidateWitness': copy.deepcopy(witness), 'beforeHash': fingerprint(live), 'beforeEnvelope': live, 'beforeWitness': copy.deepcopy(row['witness']), 'at': int(self.clock())}
         self.store.write(journal)  # Durable, signed, CAS reservation BEFORE publication.
         published = self.publish(candidate, row['witness'])
         require(self.authenticate(published) == candidate, 'SIGNED_PUBLICATION_MISMATCH')
@@ -137,10 +137,14 @@ class Coordinator:
             action='RESERVED_OPERATION_NOT_PUBLISHED'
         elif fingerprint(current)==pending['candidateHash']:
             before=self.authenticate(pending['beforeEnvelope']);source_record(before,source)
-            row['lastKnownGood']=pending['beforeEnvelope']
-            row['rollbackWitness']=pending['beforeWitness']
+            require(pending.get('kind') in {'repair','rollback'},'INVALID_PENDING_OPERATION')
+            # Authenticate and accept the actual delivered revision before clearing a reservation.
+            checked=self.verify(current,pending.get('candidateWitness',pending['beforeWitness']))
+            if pending['kind']=='repair':
+                row['lastKnownGood']=pending['beforeEnvelope']
+                row['rollbackWitness']=pending['beforeWitness']
             row['publishedHash']=fingerprint(live)
-            row['witness']=pending['beforeWitness']
+            row['witness']=checked
             row['publishedFailures']=[]
             action='PUBLISHED_OPERATION_RECONCILED_VERIFICATION_REQUIRED'
         else:
