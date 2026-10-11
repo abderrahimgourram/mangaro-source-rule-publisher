@@ -155,4 +155,13 @@ class OperationsTest(unittest.TestCase):
                 result=operation_adapter.readiness()
             self.assertEqual(result['eligible'],expected)
 
+    def test_offline_filter_excludes_only_the_existing_desktop_live_probe(self):
+        root=HERE.parents[2]
+        filter_file=root/'tools/source-rules/automation/offline-tests.gradle'
+        text=filter_file.read_text()
+        self.assertEqual(text.count('excludeTestsMatching('),1)
+        self.assertIn('MangaDarParserTest.verify live Popular page parsing produces non-empty manga list',text)
+        native=(root/'.github/workflows/source-rule-publisher.yml').read_text().split('  native:',1)[1].split('  code-native:',1)[0]
+        self.assertNotIn('offline-tests.gradle',native)
+
 if __name__=='__main__':unittest.main()

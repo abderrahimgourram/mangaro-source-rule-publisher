@@ -295,10 +295,10 @@ jobs:
             ~/.gradle/wrapper
           key: mangaro-code-gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', 'gradle/*.versions.toml', 'gradle/wrapper/gradle-wrapper.properties') }}
       - name: Targeted source tests and instrumentation compilation (no credentials)
-        run: ./gradlew -PsourceAudit=true :app:testDebugUnitTest --tests 'eu.kanade.tachiyomi.source.internal.*' :app:compileDebugAndroidTestKotlin
+        run: ./gradlew -I tools/source-rules/automation/offline-tests.gradle -PsourceAudit=true :app:testDebugUnitTest --tests 'eu.kanade.tachiyomi.source.internal.*' :app:compileDebugAndroidTestKotlin
       - name: Compilation summary
         if: always()
         env:
           NATIVE_STATUS: ${{ job.status }}
         run: |
-          printf 'Source compilation/tests: %s. Live native acceptance stays in the trusted daily/weekly tier.\n' "$NATIVE_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Source compilation/tests: %s. One desktop-HTTP live probe is excluded from deterministic CI; registered-source network and reader acceptance stays in the daily/weekly native tier.\n' "$NATIVE_STATUS" >> "$GITHUB_STEP_SUMMARY"

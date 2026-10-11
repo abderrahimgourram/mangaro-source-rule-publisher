@@ -1,0 +1,7 @@
+// The existing desktop-HTTP MangaDar probe belongs to live verification, not offline CI.
+// Native daily/weekly audits exercise the actual registered Android source and reader.
+allprojects {
+    tasks.withType(Test).configureEach {
+        filter.excludeTestsMatching('*.MangaDarParserTest.verify live Popular page parsing produces non-empty manga list')
+    }
+}

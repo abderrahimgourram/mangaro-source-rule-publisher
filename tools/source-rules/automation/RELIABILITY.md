@@ -105,3 +105,10 @@ protected publication accidentally. Repair execution reads authenticated observa
 history for *eligibility only*: three semantic failures or a pending confirmed regression.
 Healthy/unaffected sources do not trigger deep/signing jobs. Observation history never
 satisfies the independent production acceptance gates.
+
+The existing MangaDar desktop-HTTP test assumes a fixed first popular catalogue work and
+failed on the hosted runner. `offline-tests.gradle` excludes that one live method from
+deterministic code-change CI; all fixture/parser integrity tests still run. The unchanged
+real native audit checks MangaDar with the application's legitimate transport, chapter
+ownership and image decoding. This exclusion is explicitly reported and is not source
+health or production acceptance evidence. The original live test remains available.
